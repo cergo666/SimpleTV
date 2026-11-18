@@ -1,0 +1,372 @@
+name: Release Multiplatform (Android, Windows, Linux)
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+    paths-ignore:
+      - "**.md"
+      - ".editorconfig"
+      - ".gitignore"
+      - ".github/dependabot.yml"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Версия (например 1.2.0); пусто — dev-сборка"
+        required: false
+      linux_validation:
+        description: "Только проверка Linux-пакетов без публикации"
+        type: boolean
+        default: false
+      linux_diagnostic:
+        description: "Приложить Linux-пакеты к черновику GitHub Release (требует linux_validation)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  GH_REPO: ${{ github.repository }}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  version:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    outputs:
+      name: ${{ steps.version.outputs.name }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - name: Resolve release version
+        id: version
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          LINUX_VALIDATION: ${{ inputs.linux_validation }}
+          LINUX_DIAGNOSTIC: ${{ inputs.linux_diagnostic }}
+        run: |
+          version="$REQUESTED_VERSION"
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            version="$GITHUB_REF_NAME"
+          fi
+          if [ "$LINUX_VALIDATION" = true ] && [ -n "$version" ]; then
+            echo "::error::Проверку Linux запускайте без версии релиза"
+            exit 1
+          fi
+          if [ "$LINUX_DIAGNOSTIC" = true ] && [ "$LINUX_VALIDATION" != true ]; then
+            echo "::error::Для linux_diagnostic включите linux_validation"
+            exit 1
+          fi
+          if [ -z "$version" ]; then
+            echo "name=dev-$GITHUB_RUN_NUMBER" >> "$GITHUB_OUTPUT"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+          elif [[ "${version#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "name=v${version#v}" >> "$GITHUB_OUTPUT"
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::Укажите версию в формате 1.2.3 или v1.2.3"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.version.outputs.publish == 'true'
+
+      - name: Prepare draft GitHub Release
+        if: steps.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          if existing=$(gh release view "$VERSION_NAME" --json isDraft,targetCommitish); then
+            jq -e --arg sha "$GITHUB_SHA" '.isDraft and .targetCommitish == $sha' <<< "$existing" > /dev/null
+          else
+            sed '/^---$/,$d' RELEASE_NOTES.md > "$RUNNER_TEMP/simpletv-release-notes.md"
+            gh release create "$VERSION_NAME" --draft --target "$GITHUB_SHA" \
+              --title "SimpleTV $VERSION_NAME (Windows, Linux, Android)" \
+              --notes-file "$RUNNER_TEMP/simpletv-release-notes.md"
+          fi
+
+  build-android:
+    if: '!inputs.linux_validation'
+    needs: version
+    permissions:
+      contents: write
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: ${{ needs.version.outputs.name }}
+      SIMPLETV_TLS_PINS: ${{ vars.SIMPLETV_TLS_PINS }}
+      SIGNING_STORE_FILE: keystore/release.jks
+      SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: ./.github/actions/restore-catalog
+        with:
+          key: ${{ secrets.SIMPLETV_CATALOG_KEY }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-disabled: true
+
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          PUBLISH_RELEASE: ${{ needs.version.outputs.publish }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$SIGNING_STORE_PASSWORD" ] &&
+             [ -n "$SIGNING_KEY_ALIAS" ] && [ -n "$SIGNING_KEY_PASSWORD" ]; then
+            mkdir -p keystore
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > keystore/release.jks
+          elif [ "$PUBLISH_RELEASE" = true ]; then
+            echo "::error::Для публикации APK нужны все секреты релизной подписи"
+            exit 1
+          else
+            echo "SIGNING_STORE_FILE=" >> "$GITHUB_ENV"
+          fi
+
+      - name: Set Android update sequence
+        run: |
+          base=$(sed -n 's/^versionCode=//p' version.properties)
+          echo "VERSION_CODE=$((base + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Build Android APK
+        run: >
+          ./gradlew :app:assembleRelease
+          --parallel --build-cache
+          -Dorg.gradle.jvmargs="-Xmx6g -XX:+UseParallelGC"
+          -Pkotlin.incremental=false
+
+      - name: Prepare Android artifact
+        env:
+          PUBLISH_RELEASE: ${{ needs.version.outputs.publish }}
+        run: |
+          test -s app/build/outputs/mapping/release/mapping.txt
+          python3 - <<'PY'
+          import base64
+          import os
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          expected = {
+              f"assets/playlists/{path.name}.stv"
+              for path in Path("desktop/assets/playlists").glob("*.m3u")
+          }
+          with ZipFile("app/build/outputs/apk/release/app-release.apk") as apk:
+              entries = apk.namelist()
+              assert apk.read("assets/logos.json") == Path("desktop/assets/catalog/logos.json").read_bytes(), "Android logo catalog differs from the shared snapshot"
+              assert expected and expected == {name for name in entries if name.startswith("assets/playlists/")}, "Unexpected release playlist assets"
+              for abi in ("arm64-v8a", "armeabi-v7a", "x86", "x86_64"):
+                  assert f"lib/{abi}/libstvcodec.so" in entries, f"Missing native decoder for {abi}"
+              if os.environ["PUBLISH_RELEASE"] == "true":
+                  assert all(base64.b64decode(apk.read(name), validate=True)[0] == 1 for name in expected), "Release playlist missing signer binding"
+              dex = b"".join(apk.read(name) for name in entries if name.startswith("classes") and name.endswith(".dex"))
+              assert dex and b"asset://playlists/wink.m3u" not in dex, "Plain application literal in release DEX"
+          PY
+          mkdir -p out
+          cp app/build/outputs/apk/release/app-release.apk "out/SimpleTV-${VERSION_NAME#v}.apk"
+          ls -la out
+
+      - name: Attach Android files to the release draft
+        if: needs.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$VERSION_NAME" "out/SimpleTV-${VERSION_NAME#v}.apk" --clobber
+
+      - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.publish != 'true'
+        with:
+          retention-days: 3
+          name: SimpleTV-Android-${{ env.VERSION_NAME }}
+          path: out/*
+          compression-level: 0
+
+  build-linux:
+    needs: version
+    permissions:
+      contents: write
+    name: Build Linux AppImage & Binary
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      VERSION_NAME: ${{ needs.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: ./.github/actions/restore-catalog
+        with:
+          key: ${{ secrets.SIMPLETV_CATALOG_KEY }}
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libfuse2 file curl \
+            meson nasm patchelf libass-dev libasound2-dev libpulse-dev libgnutls28-dev libxml2-dev zlib1g-dev \
+            libshaderc-dev python3-venv libvulkan-dev
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          cache: true
+
+      - name: Enable Linux desktop
+        run: flutter config --enable-linux-desktop
+
+      - uses: actions/cache/restore@v6
+        id: linux-media
+        with:
+          path: build/linux-media
+          key: simpletv-linux-media-noble-x64-${{ hashFiles('packaging/linux/build-linux-mpv.sh') }}
+          restore-keys: |
+            simpletv-linux-media-noble-x64-
+
+      - name: Build Linux AppImage and Standalone Binary
+        run: |
+          chmod +x packaging/linux/build-linux-packages.sh
+          ./packaging/linux/build-linux-packages.sh "${VERSION_NAME#v}" "out"
+
+      - uses: actions/cache/save@v6
+        if: steps.linux-media.outputs.cache-hit != 'true'
+        with:
+          path: build/linux-media
+          key: ${{ steps.linux-media.outputs.cache-primary-key }}
+
+      - name: Verify both Linux bundles without system mpv or FFmpeg
+        run: |
+          docker run --rm -v "$PWD/out:/packages:ro" -v "$PWD/packaging/linux:/checks:ro" \
+            -e "STV_VERSION=${VERSION_NAME#v}" ubuntu:24.04 bash /checks/smoke-linux-packages.sh
+
+      - name: Attach Linux files to the release draft
+        if: needs.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$VERSION_NAME" \
+            "out/SimpleTV-${VERSION_NAME#v}-x86_64.AppImage" \
+            "out/SimpleTV-${VERSION_NAME#v}-linux-x64.tar.gz" --clobber
+
+      - name: Attach Linux files to a diagnostic draft
+        if: inputs.linux_diagnostic
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="linux-diagnostics-$GITHUB_RUN_ID"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --draft --target "$GITHUB_SHA" \
+              --title "SimpleTV Linux diagnostics ($VERSION_NAME)" \
+              --notes 'Run with SIMPLETV_MPV_DIAGNOSTICS=1 to print filtered playback diagnostics.'
+          fi
+          gh release upload "$tag" \
+            "out/SimpleTV-${VERSION_NAME#v}-x86_64.AppImage" \
+            "out/SimpleTV-${VERSION_NAME#v}-linux-x64.tar.gz" --clobber
+
+      - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.publish != 'true' && !inputs.linux_validation
+        with:
+          retention-days: 3
+          name: SimpleTV-Linux-${{ env.VERSION_NAME }}
+          path: out/*
+          compression-level: 0
+
+  build-windows:
+    if: '!inputs.linux_validation'
+    needs: version
+    permissions:
+      contents: write
+    name: Build Windows Inno Setup & Single Portable EXE
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: ${{ needs.version.outputs.name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: ./.github/actions/restore-catalog
+        with:
+          key: ${{ secrets.SIMPLETV_CATALOG_KEY }}
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          cache: true
+
+      - name: Enable Windows desktop
+        shell: pwsh
+        run: flutter config --enable-windows-desktop
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows Inno Setup & Portable Packages
+        shell: pwsh
+        run: |
+          & .\packaging\windows\build-windows-packages.ps1 -Version $env:VERSION_NAME -BuildNumber $env:GITHUB_RUN_NUMBER -OutputDir "out"
+
+      - name: Verify mpv playback over local HTTP
+        working-directory: desktop
+        run: flutter test --no-pub test/stream_playback_test.dart --tags native-playback
+
+      - name: Attach Windows files to the release draft
+        if: needs.version.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $version = $env:VERSION_NAME.Substring(1)
+          gh release upload $env:VERSION_NAME "out/SimpleTV-$version-Portable.exe" "out/SimpleTV-$version-Setup.exe" "out/SimpleTV-$version-Windows-Portable.zip" --clobber
+
+      - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.publish != 'true'
+        with:
+          retention-days: 3
+          name: SimpleTV-Windows-${{ env.VERSION_NAME }}
+          path: out/SimpleTV-*
+          if-no-files-found: error
+          compression-level: 0
+
+  release-checks:
+    needs: version
+    if: needs.version.outputs.publish == 'true'
+    uses: ./.github/workflows/checks.yml
+    secrets: inherit
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [version, build-android, build-linux, build-windows, release-checks]
+    if: needs.version.outputs.publish == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    env:
+      VERSION_NAME: ${{ needs.version.outputs.name }}
+    steps:
+      - name: Verify assets and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets=$(gh release view "$VERSION_NAME" --json assets \
+            --jq '.assets[] | select(.state == "uploaded" and .size > 0) | .name')
+          version="${VERSION_NAME#v}"
+          for suffix in .apk -Portable.exe -Setup.exe -Windows-Portable.zip -x86_64.AppImage -linux-x64.tar.gz; do
+            if ! grep -Fxq "SimpleTV-$version$suffix" <<< "$assets"; then
+              echo "::error::Missing release asset SimpleTV-$version$suffix"
+              exit 1
+            fi
+          done
+          gh release edit "$VERSION_NAME" --draft=false --latest

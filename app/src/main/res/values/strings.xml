@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SimpleTV</string>
+
+    <!-- Main playback screen -->
+    <string name="channel_not_found">Канал № %1$s не найден</string>
+    <string name="press_back_again">Нажмите «Назад» ещё раз для выхода</string>
+    <string name="nav_channels">Каналы</string>
+    <string name="nav_last_channel">Последний канал</string>
+    <string name="nav_programme">Программа</string>
+    <string name="nav_stream">Поток</string>
+    <string name="nav_settings">Настройки</string>
+    <string name="nav_pip">Картинка в картинке</string>
+    <string name="zap_previous">Предыдущий канал</string>
+    <string name="zap_next">Следующий канал</string>
+
+    <!-- Playback status -->
+    <string name="playback_failed">Не удалось воспроизвести: %1$s</string>
+    <string name="playback_sources_checked">Проверены все источники канала (%1$d)</string>
+    <string name="action_retry">Повторить</string>
+    <string name="hint_tv_keys">▲▼ — другой канал, OK — список</string>
+    <string name="hint_touch">Коснитесь экрана, чтобы открыть управление</string>
+    <string name="connecting">Подключение · %1$s %2$d/%3$d</string>
+
+    <!-- Info bar -->
+    <string name="pill_archive">АРХИВ</string>
+    <string name="pill_live">LIVE</string>
+    <string name="archive_available">Есть архив</string>
+    <string name="next_programme">Далее: %1$s %2$s</string>
+    <string name="action_back_to_live">В эфир</string>
+
+    <!-- Stream panel -->
+    <string name="stream_title">Поток</string>
+    <string name="section_source">Источник</string>
+    <string name="section_stream_info">Информация о потоке</string>
+    <string name="stream_status_playing">Воспроизведение подтверждено</string>
+    <string name="stream_status_reachable">Сеть доступна</string>
+    <string name="stream_status_unavailable">Недоступен</string>
+    <string name="stream_status_unknown">Не проверен</string>
+    <string name="stats_toggle_hide">Скрыть статистику поверх видео</string>
+    <string name="stats_toggle_show">Показывать статистику поверх видео</string>
+    <string name="section_quality">Качество</string>
+    <string name="quality_auto">Авто (адаптивное)</string>
+    <string name="section_image">Изображение</string>
+    <string name="image_fit">Вписать</string>
+    <string name="image_zoom">Заполнить (обрезка)</string>
+    <string name="image_fill">Растянуть</string>
+    <string name="section_other">Прочее</string>
+    <string name="action_favorite_toggle">★ Избранное: вкл/выкл</string>
+
+    <!-- Welcome -->
+    <string name="welcome_subtitle">Beeline • Wink TV • телепрограмма XMLTV</string>
+    <string name="channels_not_loaded">Каналы ещё не загружены</string>
+    <string name="action_load_playlists">Загрузить плейлисты</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Настройки</string>
+    <string name="back_to_playback">← Назад к просмотру</string>
+    <string name="section_playlists">Плейлисты</string>
+    <string name="section_channels">Каналы</string>
+    <string name="section_epg">Телепрограмма</string>
+    <string name="section_ua">User-Agent</string>
+    <string name="section_playback">Воспроизведение</string>
+    <string name="section_appearance">Оформление</string>
+    <string name="section_about">О приложении</string>
+
+    <string name="appearance_header">Акцентный цвет</string>
+    <string name="appearance_header_desc">Кнопки, фокус, выделение каналов и полосы прогресса. Применяется сразу ко всем экранам.</string>
+    <string name="accent_violet">Индиго</string>
+    <string name="accent_orange">Оранжевый</string>
+    <string name="accent_blue">Синий</string>
+    <string name="accent_teal">Бирюзовый</string>
+    <string name="accent_pink">Розовый</string>
+    <string name="accent_red">Красный</string>
+
+    <string name="sources_header">Источники каналов</string>
+    <string name="sources_header_desc">Как TVSources в SimpleTV: каналы из разных источников объединяются, при ошибке берётся следующий.</string>
+    <string name="check_streams">Проверять потоки</string>
+    <string name="check_streams_desc">HEAD 4 с → GET 6 с, как check.lua (долго)</string>
+    <string name="action_delete_source">Удалить источник</string>
+    <string name="action_add_playlist">＋ Добавить плейлист по ссылке</string>
+    <string name="add_playlist_desc">M3U/M3U8, можно указать свой User-Agent</string>
+    <string name="dialog_new_playlist">Новый плейлист</string>
+    <string name="field_name">Название</string>
+    <string name="field_link_m3u">Ссылка на m3u</string>
+    <string name="field_ua_optional">User-Agent (необязательно)</string>
+    <string name="action_refresh_playlists">⟳ Обновить плейлисты сейчас</string>
+    <string name="auto_update_channels">Автообновление каналов</string>
+    <plurals name="auto_update_days">
+        <item quantity="one">раз в %1$d день</item>
+        <item quantity="few">раз в %1$d дня</item>
+        <item quantity="many">раз в %1$d дней</item>
+        <item quantity="other">раз в %1$d дня</item>
+    </plurals>
+    <string name="skip_web_title">Пропускать ссылки на веб-страницы</string>
+    <string name="skip_web_desc">https://limehd.tv/123, картинки, t.me — это не потоки</string>
+
+    <string name="channels_header">Список каналов</string>
+    <string name="channels_header_desc">Фильтры применяются сразу, источники при этом не перезагружаются.</string>
+    <string name="hide_sd_title">Скрывать SD, если есть HD</string>
+    <string name="hide_sd_desc">Скрывает SD-дубли и исключает явно SD-потоки из вариантов HD-канала</string>
+    <string name="merge_ott_title">Объединять OTT-версии каналов</string>
+    <string name="merge_ott_desc">Каналы с пометкой «OTT» объединяются с основными версиями как резервные источники (например, Wink TV (OTT))</string>
+    <string name="hide_tz_title">Скрывать каналы других часовых поясов</string>
+    <string name="hide_tz_desc">«+2», «+4», «+7 (Архив)», «(Восток)», «Орбита»</string>
+    <string name="hide_adult_title">Скрывать каналы для взрослых (18+)</string>
+    <string name="hide_adult_desc">Фильтрует эротические и ночные каналы из списка</string>
+    <string name="prefer_max_title">Принудительно включать максимальное качество</string>
+    <string name="prefer_max_desc">Предпочитать 4K / UHD и Full HD потоки для каждого канала</string>
+    <string name="hd_groups_title">Отдельные группы «HD каналы» и «4K / UHD»</string>
+    <string name="standard_order_title">Общепринятый порядок каналов</string>
+    <string name="standard_order_desc">1 Первый, 2 Россия 1, 3 Матч ТВ, 4 НТВ, 5 Пятый, 6 Россия К, 7 Россия 24, 8 Карусель, 9 ОТР, 10 ТВ Центр, 11 РЕН ТВ, 12 Спас, 13 СТС, 14 Домашний, 15 ТВ-3, 16 Пятница!, 17 Звезда, 18 Мир, 19 ТНТ, 20 Муз-ТВ</string>
+    <string name="reverse_zap_title">Инвертировать кнопки ▲/▼</string>
+    <string name="reverse_zap_desc">По умолчанию: ▲ следующий канал (+1), ▼ предыдущий (-1). Включите, если привыкли к обратному</string>
+
+    <string name="epg_header">Источники телепрограммы (XMLTV)</string>
+    <string name="epg_header_desc">Из work/config.ini [epg]. Включено несколько — объединяются по порядку. При смене источника база перестраивается сама.</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_add_epg">＋ Добавить источник EPG</string>
+    <string name="add_epg_desc">Ссылка на xml или xml.gz</string>
+    <string name="dialog_epg_source">Источник телепрограммы</string>
+    <string name="field_link">Ссылка</string>
+    <string name="action_refresh_epg">⟳ Обновить телепрограмму</string>
+    <string name="action_clear_epg">Очистить базу и загрузить заново</string>
+    <string name="clear_epg_desc">Аналог кнопки «Очистить БД» в SimpleTV</string>
+    <string name="auto_update_epg">Автообновление программы</string>
+    <plurals name="auto_update_epg_desc">
+        <item quantity="one">раз в %1$d день (сервер проверяется по ETag)</item>
+        <item quantity="few">раз в %1$d дня (сервер проверяется по ETag)</item>
+        <item quantity="many">раз в %1$d дней (сервер проверяется по ETag)</item>
+        <item quantity="other">раз в %1$d дня (сервер проверяется по ETag)</item>
+    </plurals>
+
+    <string name="ua_header">User-Agent</string>
+    <string name="ua_header_desc">Какой UA сообщается серверу. Порядок: #EXTVLCOPT / |User-Agent= в плейлисте → UA источника → глобальный.</string>
+    <string name="ua_global">Глобальный UA потоков</string>
+    <string name="dialog_global_ua">Глобальный User-Agent</string>
+    <string name="ua_epg">UA загрузки телепрограммы</string>
+    <string name="dialog_epg_ua">UA для EPG</string>
+    <string name="ua_source">UA потоков «%1$s»</string>
+    <string name="ua_global_value">глобальный</string>
+    <string name="dialog_source_ua">UA для «%1$s» (пусто — глобальный)</string>
+    <string name="ua_found_header">Найдено в сборке SimpleTV</string>
+    <string name="ua_vlcrc">work/vlcrc — все потоки</string>
+    <string name="ua_wink">wink-tv.lua — Wink (манифест и поток)</string>
+    <string name="ua_beeline">beeline-tv.lua — служебный запрос манифеста</string>
+    <string name="ua_tvs">tvs_core — загрузка m3u источников</string>
+    <string name="ua_check">check.lua — проверка потоков</string>
+
+    <string name="playback_header">Воспроизведение</string>
+    <string name="playback_header_desc">Буфер — аналог net\\cache\\httpftp=4000 из config.ini. Применяется после перезапуска.</string>
+    <string name="buffer_title">Буфер сети</string>
+    <string name="buffer_value">%1$d мс</string>
+    <string name="remote_help">Пульт: ▲▼ — переключение каналов, OK или ◀ — список каналов, ▶ — телепрограмма, цифры — номер канала, «Меню» — качество и источник потока, долгое OK в списке — избранное.\nТелефон: касание — панель управления, свайп вверх/вниз — следующий/предыдущий канал.</string>
+
+    <string name="about_header">Android/Android TV-плеер IPTV</string>
+    <string name="about_body">• Встроенные плейлисты: Beeline и Wink TV. Дополнительные источники можно добавить в настройках.\n• Ссылки Wink/Beeline раскодируются так же, как в видеоскриптах Nexterr: base64 → reverse → base64, ключ ClearKey из token= или decryption_key.\n• Телепрограмма: iptvx.one lite, дополнительные источники доступны в настройках.\n• Архив: Wink ?offset=-N, Beeline ?starttime&amp;stoptime, остальные — по catchup-source.\n• Объединение одинаковых каналов и автопереключение источника при ошибке — как в TVSources.</string>
+
+    <string name="status_never">ещё не обновлялось</string>
+    <string name="status_last">последнее: %1$s</string>
+    <string name="presets">Пресеты</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_back">←</string>
+
+    <!-- Channel list and guide -->
+    <string name="back_to_search">‹ К результатам поиска</string>
+    <string name="action_close">Закрыть</string>
+    <string name="search_hint">Поиск канала</string>
+    <string name="action_clear">Очистить</string>
+    <string name="search_title">Поиск</string>
+    <string name="empty_group">В этой группе нет каналов</string>
+    <string name="nothing_found">Ничего не найдено</string>
+    <string name="next_programme_short">Далее · %1$s %2$s</string>
+    <string name="archive_label">архив %1$s</string>
+    <string name="archive_days">%1$d дн.</string>
+    <string name="archive_hours">%1$d ч.</string>
+    <plurals name="variants_count">
+        <item quantity="one">%1$d ист.</item>
+        <item quantity="few">%1$d ист.</item>
+        <item quantity="many">%1$d ист.</item>
+        <item quantity="other">%1$d ист.</item>
+    </plurals>
+    <string name="action_now">Сейчас</string>
+    <string name="action_from_start">С начала</string>
+    <string name="loading_guide">Загрузка программы…</string>
+    <string name="guide_not_loaded">Телепрограмма ещё не загружена</string>
+    <string name="no_programme">Нет программы для этого канала</string>
+    <string name="variant_stream">поток</string>
+    <string name="variant_own_ua">свой UA</string>
+
+    <!-- Stream statistics -->
+    <string name="stats_protocol">Протокол</string>
+    <string name="stats_source">Источник</string>
+    <string name="stats_source_value">%1$s (%2$d/%3$d)</string>
+    <string name="stats_video">Видео</string>
+    <string name="stats_profile">Профиль</string>
+    <string name="stats_video_bitrate">Битрейт видео</string>
+    <string name="stats_video_decoder">Декодер видео</string>
+    <string name="stats_frames">Кадры</string>
+    <string name="stats_frames_value">вывод %1$s fps • потеряно %2$d</string>
+    <string name="stats_audio">Аудио</string>
+    <string name="stats_audio_bitrate">Битрейт аудио</string>
+    <string name="stats_audio_decoder">Декодер аудио</string>
+    <string name="stats_sample_rate">%1$s кГц</string>
+    <string name="stats_network">Сеть</string>
+    <string name="stats_network_value">оценка %1$s • сейчас %2$s</string>
+    <string name="stats_buffer">Буфер</string>
+    <string name="stats_buffer_value">%1$s с</string>
+    <string name="stats_buffer_offset">%1$s • отставание от эфира %2$s с</string>
+    <string name="stats_loaded">Загружено</string>
+    <string name="stats_loaded_value">%1$s МБ</string>
+    <string name="stats_user_agent">User-Agent</string>
+    <string name="decoder_hw">аппаратный</string>
+    <string name="decoder_sw">программный</string>
+
+    <!-- View model messages -->
+    <string name="playlist_busy_refresh">Обновление плейлистов…</string>
+    <string name="error_refresh">Ошибка обновления: %1$s</string>
+    <plurals name="playlists_updated">
+        <item quantity="one">Плейлист обновлён: %1$d канал</item>
+        <item quantity="few">Плейлист обновлён: %1$d канала</item>
+        <item quantity="many">Плейлист обновлён: %1$d каналов</item>
+        <item quantity="other">Плейлист обновлён: %1$d канала</item>
+    </plurals>
+    <string name="epg_checking">Телепрограмма: проверка…</string>
+    <string name="error_epg">Ошибка телепрограммы: %1$s</string>
+    <string name="epg_updated">Телепрограмма обновлена</string>
+    <string name="epg_relink">Телепрограмма: привязка новых каналов…</string>
+    <string name="archive_unavailable">Архив недоступен для этой передачи</string>
+    <string name="archive_unavailable_source">Архив недоступен у источника «%1$s»</string>
+    <string name="source_selected">Источник: %1$s (%2$d/%3$d)</string>
+    <string name="single_source">У канала один источник</string>
+    <string name="no_archive_source">У этой передачи нет другого источника архива</string>
+    <string name="favorite_added">«%1$s» добавлен в избранное</string>
+    <string name="favorite_removed">«%1$s» удалён из избранного</string>
+    <string name="default_playlist_name">Мой плейлист</string>
+    <string name="source_loading">%1$s: загрузка…</string>
+    <string name="source_error">%1$s: %2$s</string>
+
+    <!-- Watchdog, stream errors and quality -->
+    <string name="watchdog_slow_stream">поток не грузится 3.5 с</string>
+    <string name="watchdog_slow_start">первый кадр не появился за 12 с</string>
+    <string name="watchdog_frozen_frame">картинка застыла</string>
+    <string name="watchdog_switch">Сторож: %1$s — переход на %2$s (%3$d/%4$d)</string>
+    <string name="watchdog_restart">Сторож: %1$s — перезапуск</string>
+    <string name="stream_error_switch">Ошибка потока, переключаюсь на «%1$s» (%2$d/%3$d)</string>
+    <string name="error_http_code">Сервер ответил %1$d</string>
+    <string name="error_no_connection">Нет связи с сервером потока</string>
+    <string name="error_drm">Ошибка расшифровки (DRM)</string>
+    <string name="error_format_unsupported">Формат не поддерживается устройством</string>
+    <string name="protocol_progressive">прогрессивный</string>
+    <string name="quality_kbps">%1$d кбит/с</string>
+    <string name="pip_error">Не удалось открыть картинку в картинке</string>
+
+    <!-- Special group labels -->
+    <string name="group_all">Все каналы</string>
+    <string name="group_favourites">Избранное</string>
+    <string name="group_now">Сейчас в эфире</string>
+    <string name="group_recent">Недавние</string>
+    <string name="group_hd">HD каналы</string>
+    <string name="group_uhd">4K / UHD</string>
+    <string name="group_new">Новые каналы</string>
+    <string name="group_generic">Общие</string>
+
+    <!-- EPG repository status -->
+    <string name="epg_no_sources">Нет включённых источников</string>
+    <string name="epg_loading">Программа: %1$s — загрузка…</string>
+    <string name="epg_unchanged">не изменилась</string>
+    <string name="epg_empty_response">пустой ответ</string>
+    <string name="epg_downloaded_mb">Программа: %1$s — %2$d МБ</string>
+    <string name="epg_updated_short">обновлена</string>
+    <string name="epg_error_status">ошибка (%1$s)</string>
+    <string name="epg_count_prefix">передач: </string>
+    <string name="epg_parsing">Программа: %1$s — разбор…</string>
+    <string name="epg_parsed_count">Программа: %1$s — %2$d передач</string>
+    <string name="epg_parse_error">Программа: %1$s — ошибка разбора: %2$s</string>
+    <string name="epg_indexing">Программа: индексация…</string>
+    <string name="preset_vlcrc">Как в SimpleTV (Chrome 109 / Opera 95)</string>
+    <string name="preset_wink">Samsung Tizen TV (Wink)</string>
+    <string name="preset_firefox">Firefox 102</string>
+    <string name="preset_vlc">VLC 3.0.21</string>
+    <string name="preset_exoplayer">Android ExoPlayer</string>
+    <string name="epgsrc_iptvx_lite">iptvx.one lite (лёгкая, без описаний)</string>
+    <string name="epgsrc_epgpw">epg.pw RU (3 дня, без прошедших)</string>
+    <string name="epgsrc_programtv">programtv.ru (мини)</string>
+    <string name="epgsrc_iptvx">iptvx.one полная</string>
+    <string name="epgsrc_edem">epg.one (edem)</string>
+    <string name="epgsrc_gabba">gabbarit</string>
+    <string name="epgsrc_glanz">ottg.tv (glanz)</string>
+    <string name="field_ua">User-Agent</string>
+    <string name="error_invalid_url">Некорректный адрес</string>
+
+    <!-- Сообщения из :core (подключаются через Messages в StvApp) -->
+    <string name="core_playlist_loading">%1$s: загрузка…</string>
+    <string name="core_playlist_error">%1$s: ошибка — %2$s</string>
+    <string name="core_playlist_status_error">ошибка</string>
+    <string name="core_playlist_n_of_m">%1$s: плейлист %2$d из %3$d</string>
+    <string name="core_playlist_unavailable">плейлист недоступен</string>
+    <string name="core_playlist_checking">%1$s: проверка %2$d из %3$d • рабочих %4$d</string>
+    <string name="core_playlist_rechecking">%1$s: перепроверка %2$d из %3$d • рабочих %4$d</string>
+    <string name="core_rate_mbps">%1$.1f Мбит/с</string>
+    <string name="core_rate_kbps">%1$d кбит/с</string>
+    <string name="core_channels_mono">моно</string>
+    <plurals name="core_playlist_channels">
+        <item quantity="one">%1$s: %2$d канал</item>
+        <item quantity="few">%1$s: %2$d канала</item>
+        <item quantity="many">%1$s: %2$d каналов</item>
+        <item quantity="other">%1$s: %2$d канала</item>
+    </plurals>
+    <string name="browse_home">Главная</string>
+    <string name="browse_home_startup">Открывать главную при запуске</string>
+    <string name="browse_preview_first">Предпросмотр по OK на телевизоре</string>
+    <string name="browse_preview_hint">Первое OK открывает предпросмотр, второе — полный экран</string>
+    <string name="browse_continue">Продолжить просмотр</string>
+</resources>

@@ -1,0 +1,13 @@
+#EXTM3U url-tvg="https://example.test/epg.xml"
+
+#EXTINF:-1 tvg-id="one" tvg-name="One HD" tvg-logo="https://example.test/one.png" group-title="News" catchup-days="3",Channel One
+#EXTVLCOPT:http-user-agent=Agent/1.0
+#EXTVLCOPT:http-referrer=https://example.test/ref
+https://example.test/one.m3u8
+
+#EXTINF:-1 group-title="Movies",  Movie   Two
+https://example.test/two.m3u8|User-Agent=PipeAgent&Referer=https%3A%2F%2Fexample.test%2Fpipe
+
+#EXTINF:-1,Channel Three
+#EXTGRP:Sport
+https://example.test/three.m3u8

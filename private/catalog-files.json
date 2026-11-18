@@ -1,0 +1,20 @@
+[
+  "core/src/main/java/io/mediacast/simpletv/data/PublicTv.kt",
+  "core/src/main/java/io/mediacast/simpletv/data/Settings.kt",
+  "core/src/main/java/io/mediacast/simpletv/data/StreamResolver.kt",
+  "core/src/test/java/io/mediacast/simpletv/data/PublicTvTest.kt",
+  "core/src/test/java/io/mediacast/simpletv/data/SettingsTest.kt",
+  "core/src/test/java/io/mediacast/simpletv/data/StreamResolverTest.kt",
+  "desktop/assets/playlists/beeline.m3u",
+  "desktop/assets/playlists/cinerama.m3u",
+  "desktop/assets/playlists/smotrim.m3u",
+  "desktop/assets/playlists/sputnik24.m3u",
+  "desktop/assets/playlists/vitrina.m3u",
+  "desktop/assets/playlists/wink.m3u",
+  "desktop/lib/data/models/settings_model.dart",
+  "desktop/lib/data/services/public_tv.dart",
+  "desktop/lib/data/services/stream_resolver.dart",
+  "desktop/test/arranger_test.dart",
+  "desktop/test/failover_test.dart",
+  "desktop/test/public_tv_test.dart"
+]

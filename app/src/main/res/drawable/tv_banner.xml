@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Android TV launcher banner. The Leanback launcher expects a 320x180 (16:9)
+    drawable and falls back to the square launcher icon when the banner has no
+    wide intrinsic size. The explicit width/height on the layer-list (API 23+)
+    guarantees the correct aspect ratio regardless of the layers inside it.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:width="320dp"
+    android:height="180dp"
+    tools:ignore="VectorRaster">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="320dp"
+                android:height="180dp" />
+            <gradient
+                android:angle="135"
+                android:endColor="#242A55"
+                android:startColor="#0B1020" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:gravity="center"
+        android:width="150dp"
+        android:height="150dp" />
+</layer-list>

@@ -1,0 +1,77 @@
+name: Checks
+
+on:
+  workflow_call:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/restore-catalog
+        with:
+          key: ${{ secrets.SIMPLETV_CATALOG_KEY }}
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-disabled: true
+      - run: ./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug ktlintCheck --console=plain
+
+  desktop:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/restore-catalog
+        with:
+          key: ${{ secrets.SIMPLETV_CATALOG_KEY }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          cache: true
+      - name: Check version consistency
+        run: |
+          prop=$(sed -n 's/^versionName=//p' ../version.properties)
+          pub=$(sed -n 's/^version: //p' pubspec.yaml)
+          if [ "${pub%%+*}" != "$prop" ]; then
+            echo "::error::desktop/pubspec.yaml ($pub) does not match version.properties ($prop)"
+            exit 1
+          fi
+      - run: flutter pub get
+      - run: flutter gen-l10n
+      - run: dart format --output=none --set-exit-if-changed lib test tool
+      - run: flutter analyze
+      - run: flutter test --exclude-tags native-playback
+
+  desktop-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/restore-catalog
+        with:
+          key: ${{ secrets.SIMPLETV_CATALOG_KEY }}
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build windows --release

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Playlists and settings can contain private provider URLs and access tokens,
+    so they are kept out of Android backups. The EPG database is a downloadable
+    cache and does not need to be backed up either.
+-->
+<full-backup-content>
+    <exclude
+        domain="sharedpref"
+        path="stv.xml" />
+    <exclude
+        domain="file"
+        path="sources" />
+    <exclude
+        domain="file"
+        path="epg.db" />
+    <exclude
+        domain="file"
+        path="epg_new.db" />
+    <exclude
+        domain="file"
+        path="epg_cache" />
+</full-backup-content>
