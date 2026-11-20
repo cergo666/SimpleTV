@@ -424,15 +424,35 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
 
         if (overlay == Overlay.PLAYLIST || (overlay == Overlay.EPG && !isTv)) browseState.SaveableStateProvider("browse") {
             PlaylistOverlay(
-                vm, wide, now, group, { group = it },
+                vm = vm,
+                isTv = isTv,
+                wide = wide,
+                now = now,
+                group = group,
+                onGroup = { group = it },
                 focusEpg = overlay == Overlay.EPG,
                 onClose = { vm.closeOverlay() },
                 onSettings = { vm.setOverlay(Overlay.SETTINGS) },
                 onHome = { vm.setOverlay(Overlay.HOME) },
+                onGuide = if (isTv) ({ vm.setOverlay(Overlay.EPG) }) else null,
                 videoPreview = if (usePreview) ({
-                    Box(Modifier.fillMaxWidth().height(minOf(maxHeight * 0.28f, 180.dp)).background(Color.Black)) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(minOf(maxHeight * 0.28f, 168.dp))
+                            .clip(RoundedCornerShape(AppRadius.panel))
+                            .background(Color.Black)
+                            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.panel)),
+                    ) {
                         video(resize, Modifier.fillMaxSize())
-                        PlaybackStatus(vm, playback, true, compact = true, onChannels = {}, modifier = Modifier.align(Alignment.Center))
+                        PlaybackStatus(
+                            vm = vm,
+                            s = playback,
+                            isTv = true,
+                            compact = true,
+                            onChannels = {},
+                            modifier = Modifier.align(Alignment.Center).padding(AppSpace.sm),
+                        )
                     }
                 }) else null,
             )
@@ -492,7 +512,12 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)),
             ) {
                 PlaylistOverlay(
-                    vm, false, now, group, { group = it },
+                    vm = vm,
+                    isTv = false,
+                    wide = false,
+                    now = now,
+                    group = group,
+                    onGroup = { group = it },
                     focusEpg = false,
                     onClose = {},
                     onSettings = { vm.setOverlay(Overlay.SETTINGS) },

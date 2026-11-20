@@ -38,6 +38,11 @@
     <string name="hint_stream">Поток</string>
     <string name="hint_seek_30s">±30 с</string>
     <string name="hint_back_live">В эфир</string>
+    <string name="hint_watch">Смотреть</string>
+    <string name="hint_preview_or_watch">Предпросмотр / Смотреть</string>
+    <string name="hint_favorite">Избранное</string>
+    <string name="hint_columns">Колонки</string>
+    <string name="hint_back">Назад</string>
 
     <!-- Info bar -->
     <string name="pill_archive">АРХИВ</string>
@@ -246,6 +251,7 @@
     <string name="epg_updated">Телепрограмма обновлена</string>
     <string name="epg_relink">Телепрограмма: привязка новых каналов…</string>
     <string name="archive_unavailable">Архив недоступен для этой передачи</string>
+    <string name="programme_not_started">Эта передача ещё не началась</string>
     <string name="archive_unavailable_source">Архив недоступен у источника «%1$s»</string>
     <string name="source_selected">Источник: %1$s (%2$d/%3$d)</string>
     <string name="single_source">У канала один источник</string>

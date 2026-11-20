@@ -35,6 +35,11 @@
     <string name="hint_stream">Stream</string>
     <string name="hint_seek_30s">±30 s</string>
     <string name="hint_back_live">Live</string>
+    <string name="hint_watch">Watch</string>
+    <string name="hint_preview_or_watch">Preview / Watch</string>
+    <string name="hint_favorite">Favourite</string>
+    <string name="hint_columns">Columns</string>
+    <string name="hint_back">Back</string>
 
     <string name="pill_archive">ARCHIVE</string>
     <string name="pill_live">LIVE</string>
@@ -228,6 +233,7 @@
     <string name="epg_updated">Programme guide updated</string>
     <string name="epg_relink">Programme guide: matching new channels…</string>
     <string name="archive_unavailable">Archive is not available for this programme</string>
+    <string name="programme_not_started">This programme has not started yet</string>
     <string name="archive_unavailable_source">Archive is not available in source “%1$s”</string>
     <string name="source_selected">Source: %1$s (%2$d/%3$d)</string>
     <string name="single_source">This channel has a single source</string>

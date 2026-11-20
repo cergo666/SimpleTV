@@ -1,21 +1,26 @@
 package io.mediacast.simpletv.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,45 +31,50 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import io.mediacast.simpletv.R
 import io.mediacast.simpletv.data.Channel
 import io.mediacast.simpletv.data.Programme
 import io.mediacast.simpletv.data.StreamResolver
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlaylistOverlay(
     vm: MainViewModel,
+    isTv: Boolean,
     wide: Boolean,
     now: Long,
     group: String,
@@ -74,6 +84,7 @@ fun PlaylistOverlay(
     onSettings: () -> Unit,
     embedded: Boolean = false,
     onHome: (() -> Unit)? = null,
+    onGuide: (() -> Unit)? = null,
     videoPreview: (@Composable () -> Unit)? = null,
 ) {
     val all by vm.channels.collectAsState()
@@ -84,6 +95,7 @@ fun PlaylistOverlay(
     val playing = playback.channel
     var query by rememberSaveable { mutableStateOf("") }
     var guideSelection by remember { mutableStateOf<Pair<Channel, Programme>?>(null) }
+    var focusChannelsNonce by remember { mutableIntStateOf(0) }
     val groups = remember(all, fav, recent) {
         val seen = all.count { it.key in recent }
         listOf(Group(MainViewModel.NOW, -1, true)) +
@@ -132,9 +144,26 @@ fun PlaylistOverlay(
 
     guideSelection?.let { (ch, programme) ->
         BackHandler { guideSelection = null }
-        Column(Modifier.fillMaxSize().background(C.Panel).padding(10.dp)) {
-            FocusItem(onClick = { guideSelection = null }) { _ ->
-                Text(stringResource(R.string.back_to_search), color = C.Text, modifier = Modifier.padding(10.dp))
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(C.Panel)
+                .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.safeDrawing) else Modifier)
+                .padding(AppSpace.md),
+            verticalArrangement = Arrangement.spacedBy(AppSpace.sm),
+        ) {
+            FocusItem(
+                containerColor = C.Card,
+                borderColor = C.Border,
+                shape = RoundedCornerShape(AppRadius.control),
+                onClick = { guideSelection = null },
+            ) { _ ->
+                Text(
+                    stringResource(R.string.back_to_search),
+                    color = C.Text,
+                    fontSize = AppType.body,
+                    modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
+                )
             }
             EpgPanel(
                 vm, ch, now, focusCurrent = false, selectedProgramme = programme,
@@ -147,110 +176,245 @@ fun PlaylistOverlay(
     }
 
     if (wide) {
-        Row(
+        Column(
             Modifier
-                .fillMaxHeight()
-                .fillMaxWidth()
+                .fillMaxSize()
                 .background(C.panelBrush)
-                .padding(start = 24.dp, top = 20.dp, bottom = 20.dp, end = 24.dp)
+                .then(
+                    if (isTv) Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
+                    else Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = AppSpace.xl, vertical = AppSpace.lg),
+                ),
         ) {
-            GroupsColumn(groups, effectiveGroup, onGroup = { onGroup(it); query = "" }, onSettings = onSettings, onHome = onHome, now = now, modifier = Modifier.weight(0.24f).fillMaxHeight())
-            Spacer(Modifier.width(12.dp))
-            ChannelsColumn(
-                vm, list, playing, fav, now, effectiveGroup, query, { query = it },
-                matches = matches,
-                focusCurrent = !focusEpg,
-                onFocus = { focusedKey = it.key }, onPlay = play, restoreKey = focused?.key,
-                modifier = Modifier.weight(0.40f).fillMaxHeight()
-            )
-            Spacer(Modifier.width(12.dp))
-            val epgCh = focused ?: playing
-            if (epgCh != null) {
-                Column(Modifier.weight(0.36f).fillMaxHeight()) {
-                    if (videoPreview != null) {
-                        videoPreview()
-                        Text(stringResource(R.string.browse_preview_hint), color = C.Text2, fontSize = 12.sp, modifier = Modifier.padding(vertical = 8.dp))
+            Row(Modifier.weight(1f).fillMaxWidth()) {
+                GroupsColumn(
+                    groups = groups,
+                    selected = effectiveGroup,
+                    onGroup = {
+                        onGroup(it)
+                        query = ""
+                    },
+                    onConfirmGroup = {
+                        onGroup(it)
+                        query = ""
+                        focusChannelsNonce++
+                    },
+                    onSettings = onSettings,
+                    onHome = onHome,
+                    onGuide = onGuide,
+                    now = now,
+                    modifier = Modifier.weight(0.24f).fillMaxHeight(),
+                )
+                Spacer(Modifier.width(AppSpace.md))
+                ChannelsColumn(
+                    vm = vm,
+                    list = list,
+                    playing = playing,
+                    fav = fav,
+                    now = now,
+                    group = effectiveGroup,
+                    query = query,
+                    onQuery = { query = it },
+                    focusCurrent = !focusEpg,
+                    focusChannelsNonce = focusChannelsNonce,
+                    onFocus = { focusedKey = it.key },
+                    onPlay = play,
+                    restoreKey = focused?.key,
+                    matches = matches,
+                    modifier = Modifier.weight(0.40f).fillMaxHeight(),
+                )
+                Spacer(Modifier.width(AppSpace.md))
+                val epgCh = focused ?: playing
+                if (epgCh != null) {
+                    Column(Modifier.weight(0.36f).fillMaxHeight()) {
+                        if (videoPreview != null) {
+                            videoPreview()
+                            Spacer(Modifier.height(AppSpace.sm))
+                        }
+                        EpgPanel(
+                            vm = vm,
+                            ch = epgCh,
+                            now = now,
+                            focusCurrent = focusEpg,
+                            compact = videoPreview != null,
+                            selectedProgramme = matches[epgCh.key]?.takeIf { query.isNotBlank() },
+                            onPlayLive = { play(epgCh) },
+                            onPlayArchive = { p -> vm.playArchive(epgCh, p); onClose() },
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                        )
                     }
-                    EpgPanel(
-                    vm, epgCh, now, focusCurrent = focusEpg,
-                    selectedProgramme = matches[epgCh.key]?.takeIf { query.isNotBlank() },
-                    onPlayLive = { play(epgCh) },
-                    onPlayArchive = { p -> vm.playArchive(epgCh, p); onClose() },
-                    modifier = Modifier.weight(1f).fillMaxWidth()
-                    )
+                } else {
+                    Column(Modifier.weight(0.36f)) { videoPreview?.invoke() }
                 }
-            } else Column(Modifier.weight(0.36f)) { videoPreview?.invoke() }
+            }
+            if (isTv) {
+                val okLabel = stringResource(if (videoPreview != null) R.string.hint_preview_or_watch else R.string.hint_watch)
+                RemoteHintBar(
+                    listOf(
+                        stringResource(R.string.hint_key_ok) to okLabel,
+                        stringResource(R.string.hint_key_menu) to stringResource(R.string.hint_favorite),
+                        stringResource(R.string.hint_key_lr) to stringResource(R.string.hint_columns),
+                        stringResource(R.string.hint_key_back) to stringResource(R.string.hint_back),
+                    ),
+                    modifier = Modifier.padding(top = AppSpace.sm),
+                )
+            }
         }
     } else {
         Column(
             Modifier
                 .fillMaxSize()
                 .background(C.Panel)
-                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .then(if (!embedded) Modifier.windowInsetsPadding(WindowInsets.safeDrawing) else Modifier)
+                .padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!embedded) Icon(Icons.Default.Close, stringResource(R.string.action_close), tint = C.Text, modifier = Modifier.clip(CircleShape).clickable { onClose() }.padding(12.dp).size(24.dp))
-                Text(stringResource(R.string.nav_channels), color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f).padding(start = 4.dp))
-                Icon(Icons.Default.Settings, stringResource(R.string.nav_settings), tint = C.Text2, modifier = Modifier.clip(CircleShape).clickable { onSettings() }.padding(12.dp).size(24.dp))
+                if (!embedded) {
+                    FocusItem(Modifier.size(48.dp), shape = CircleShape, onClick = onClose) { _ ->
+                        Icon(Icons.Default.Close, stringResource(R.string.action_close), tint = C.Text, modifier = Modifier.align(Alignment.Center))
+                    }
+                }
+                Text(
+                    stringResource(R.string.nav_channels),
+                    color = C.Text,
+                    fontSize = AppType.title,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f).padding(start = AppSpace.xs),
+                )
+                FocusItem(Modifier.size(48.dp), shape = CircleShape, onClick = onSettings) { _ ->
+                    Icon(Icons.Default.Settings, stringResource(R.string.nav_settings), tint = C.Text2, modifier = Modifier.align(Alignment.Center))
+                }
             }
-            SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(vertical = 6.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
+            SearchField(query, { query = it }, Modifier.fillMaxWidth().padding(vertical = AppSpace.xs))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
+                contentPadding = PaddingValues(vertical = AppSpace.xs),
+            ) {
                 items(groups, key = { it.name }) { g ->
                     val sel = g.name == effectiveGroup
-                    Box(
-                        Modifier.clip(RoundedCornerShape(50))
-                            .background(if (sel) C.Accent else C.Card)
-                            .clickable { onGroup(g.name); query = "" }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) { Text(if (g.count < 0) groupLabel(g.name) else "${groupLabel(g.name)}  ${g.count}", color = if (sel) C.OnAccent else C.Text2, fontSize = 13.sp) }
+                    FocusItem(
+                        selected = sel,
+                        containerColor = if (sel) C.Accent else C.Card,
+                        borderColor = if (sel) Color.Transparent else C.Border,
+                        shape = RoundedCornerShape(50),
+                        onClick = { onGroup(g.name); query = "" },
+                    ) { _ ->
+                        Text(
+                            if (g.count < 0) groupLabel(g.name) else "${groupLabel(g.name)}  ${g.count}",
+                            color = if (sel) C.OnAccent else C.Text2,
+                            fontSize = AppType.caption,
+                            fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
+                        )
+                    }
                 }
             }
             ChannelsColumn(
-                vm, list, playing, fav, now, effectiveGroup, query, { query = it },
+                vm = vm,
+                list = list,
+                playing = playing,
+                fav = fav,
+                now = now,
+                group = effectiveGroup,
+                query = query,
+                onQuery = { query = it },
+                focusCurrent = false,
+                focusChannelsNonce = 0,
+                onFocus = {},
+                onPlay = play,
+                showHeader = false,
                 matches = matches,
-                focusCurrent = false, showHeader = false,
-                onFocus = {}, onPlay = play, modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
 }
 
 @Composable
-private fun GroupsColumn(groups: List<Group>, selected: String, onGroup: (String) -> Unit, onSettings: () -> Unit, onHome: (() -> Unit)?, now: Long, modifier: Modifier) {
+private fun GroupsColumn(
+    groups: List<Group>,
+    selected: String,
+    onGroup: (String) -> Unit,
+    onConfirmGroup: (String) -> Unit,
+    onSettings: () -> Unit,
+    onHome: (() -> Unit)?,
+    onGuide: (() -> Unit)?,
+    now: Long,
+    modifier: Modifier,
+) {
     Column(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 8.dp, bottom = 12.dp)) {
-            Box(Modifier.size(10.dp).clip(CircleShape).background(C.accentBrush))
-            Text("  ${stringResource(R.string.app_name)}", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = AppSpace.sm, vertical = AppSpace.xs)) {
+            Image(
+                painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier.size(28.dp),
+            )
+            Spacer(Modifier.width(AppSpace.xs))
+            Text(stringResource(R.string.app_name), color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold)
             Spacer(Modifier.weight(1f))
-            Text(hhmm(now), color = C.Text2, fontSize = 16.sp, modifier = Modifier.padding(end = 8.dp))
+            Text(hhmm(now), color = C.Text2, fontSize = AppType.subtitle, fontWeight = FontWeight.SemiBold)
         }
-        if (onHome != null) FocusItem(Modifier.fillMaxWidth(), onClick = onHome) { _ ->
-            Text(stringResource(R.string.browse_home), color = C.Text, modifier = Modifier.padding(12.dp))
+        Spacer(Modifier.height(AppSpace.sm))
+        if (onHome != null) {
+            FocusItem(Modifier.fillMaxWidth(), shape = RoundedCornerShape(AppRadius.control), onClick = onHome) { _ ->
+                Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Home, null, tint = C.Text2, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(AppSpace.sm))
+                    Text(stringResource(R.string.browse_home), color = C.Text, fontSize = AppType.body, fontWeight = FontWeight.Medium)
+                }
+            }
         }
-        LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        if (onGuide != null) {
+            FocusItem(Modifier.fillMaxWidth(), shape = RoundedCornerShape(AppRadius.control), onClick = onGuide) { _ ->
+                Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.DateRange, null, tint = C.Text2, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(AppSpace.sm))
+                    Text(stringResource(R.string.nav_programme), color = C.Text, fontSize = AppType.body, fontWeight = FontWeight.Medium)
+                }
+            }
+        }
+        HorizontalDivider(color = C.Divider, modifier = Modifier.padding(vertical = AppSpace.xs))
+        LazyColumn(
+            Modifier.weight(1f),
+            contentPadding = PaddingValues(AppSpace.xs),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
             items(groups, key = { it.name }) { g ->
+                val isSelected = g.name == selected
                 FocusItem(
                     Modifier.fillMaxWidth(),
-                    selected = g.name == selected,
-                    onFocus = { if (g.name != selected) onGroup(g.name) },
-                    onClick = { onGroup(g.name) },
+                    selected = isSelected,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onFocus = { if (!isSelected) onGroup(g.name) },
+                    onClick = { onConfirmGroup(g.name) },
                 ) { _ ->
-                    Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (g.name == MainViewModel.FAV) Icon(Icons.Default.Star, null, tint = C.Accent2, modifier = Modifier.size(16.dp).padding(end = 4.dp))
+                    Row(Modifier.padding(horizontal = AppSpace.sm, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+                        SelectedBar(isSelected)
+                        Spacer(Modifier.width(AppSpace.sm))
+                        if (g.name == MainViewModel.FAV) {
+                            Icon(Icons.Default.Star, null, tint = C.Accent2, modifier = Modifier.padding(end = AppSpace.xs).size(16.dp))
+                        }
                         Text(
-                            groupLabel(g.name), color = if (g.name == selected) C.Text else C.Text2,
-                            fontWeight = if (g.special) FontWeight.SemiBold else FontWeight.Normal,
-                            fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                            groupLabel(g.name),
+                            color = if (isSelected) C.Text else C.Text2,
+                            fontWeight = if (g.special || isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                            fontSize = AppType.body,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
                         )
-                        if (g.count >= 0) Text("${g.count}", color = C.Text3, fontSize = 13.sp)
+                        if (g.count >= 0) {
+                            Text("${g.count}", color = C.Text3, fontSize = AppType.caption, modifier = Modifier.padding(start = AppSpace.sm))
+                        }
                     }
                 }
             }
         }
-        FocusItem(Modifier.fillMaxWidth().padding(top = 8.dp), onClick = onSettings) { _ ->
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        HorizontalDivider(color = C.Divider, modifier = Modifier.padding(vertical = AppSpace.xs))
+        FocusItem(Modifier.fillMaxWidth(), shape = RoundedCornerShape(AppRadius.control), onClick = onSettings) { _ ->
+            Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Settings, null, tint = C.Text2, modifier = Modifier.size(18.dp))
-                Text("  ${stringResource(R.string.nav_settings)}", color = C.Text2, fontSize = 15.sp)
+                Spacer(Modifier.width(AppSpace.sm))
+                Text(stringResource(R.string.nav_settings), color = C.Text2, fontSize = AppType.body)
             }
         }
     }
@@ -258,24 +422,35 @@ private fun GroupsColumn(groups: List<Group>, selected: String, onGroup: (String
 
 @Composable
 private fun SearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(AppRadius.control)
     Row(
-        modifier.clip(RoundedCornerShape(12.dp)).background(C.Card).padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier
+            .clip(shape)
+            .background(if (focused) C.CardHover else C.Card)
+            .border(if (focused) 2.dp else 1.dp, if (focused) C.Accent2 else C.Border, shape)
+            .padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Icons.Default.Search, null, tint = C.Text3, modifier = Modifier.size(18.dp))
-        Box(Modifier.weight(1f).padding(start = 8.dp)) {
-            if (query.isEmpty()) Text(stringResource(R.string.search_hint), color = C.Text3, fontSize = 15.sp)
+        Icon(Icons.Default.Search, null, tint = if (focused) C.Accent2 else C.Text3, modifier = Modifier.size(18.dp))
+        Box(Modifier.weight(1f).padding(start = AppSpace.sm)) {
+            if (query.isEmpty()) Text(stringResource(R.string.search_hint), color = C.Text3, fontSize = AppType.body)
             BasicTextField(
-                query, onQuery, singleLine = true,
-                textStyle = TextStyle(color = C.Text, fontSize = 15.sp),
-                cursorBrush = SolidColor(C.Accent),
-                modifier = Modifier.fillMaxWidth()
+                value = query,
+                onValueChange = onQuery,
+                singleLine = true,
+                textStyle = TextStyle(color = C.Text, fontSize = AppType.body),
+                cursorBrush = SolidColor(C.Accent2),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { focused = it.isFocused },
             )
         }
-        if (query.isNotEmpty()) Icon(
-            Icons.Default.Close, stringResource(R.string.action_clear), tint = C.Text3,
-            modifier = Modifier.clip(CircleShape).clickable { onQuery("") }.padding(12.dp).size(24.dp),
-        )
+        if (query.isNotEmpty()) {
+            FocusItem(Modifier.size(36.dp), shape = CircleShape, onClick = { onQuery("") }) { _ ->
+                Icon(Icons.Default.Close, stringResource(R.string.action_clear), tint = C.Text2, modifier = Modifier.align(Alignment.Center).size(18.dp))
+            }
+        }
     }
 }
 
@@ -290,6 +465,7 @@ private fun ChannelsColumn(
     query: String,
     onQuery: (String) -> Unit,
     focusCurrent: Boolean,
+    focusChannelsNonce: Int,
     onFocus: (Channel) -> Unit,
     onPlay: (Channel) -> Unit,
     modifier: Modifier = Modifier,
@@ -300,32 +476,55 @@ private fun ChannelsColumn(
     val state = rememberLazyListState()
     val target = list.indexOfFirst { it.key == (restoreKey ?: playing?.key) }.let { if (it < 0) 0 else it }
     val fr = remember { FocusRequester() }
-    // При смене выборки возвращаемся к текущей позиции, а не к протухшему offset.
-    LaunchedEffect(focusCurrent, query, group, list.size) {
+
+    // Прокручиваем при смене группы или поиска, но не крадём фокус из колонки групп и поля поиска.
+    LaunchedEffect(query, group) {
         if (list.isNotEmpty()) state.scrollToItem((target - 4).coerceAtLeast(0))
-        if (focusCurrent) {
-            delay(80)
-            runCatching { fr.requestFocus() }
-        }
     }
+
+    // Начальный фокус при открытии оверлея или явном подтверждении (OK) группы.
+    LaunchedEffect(focusCurrent, focusChannelsNonce) {
+        if (!focusCurrent && focusChannelsNonce == 0) return@LaunchedEffect
+        if (list.isNotEmpty()) state.scrollToItem((target - 4).coerceAtLeast(0))
+        delay(80)
+        runCatching { fr.requestFocus() }
+    }
+
     Column(modifier) {
         if (showHeader) {
-            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(start = 8.dp, bottom = 8.dp)) {
-                Text(if (query.isBlank()) group else stringResource(R.string.search_title), color = C.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("  ${list.size}", color = C.Text3, fontSize = 15.sp, modifier = Modifier.padding(bottom = 3.dp))
+            Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(start = AppSpace.sm, bottom = AppSpace.sm)) {
+                Text(
+                    if (query.isBlank()) groupLabel(group) else stringResource(R.string.search_title),
+                    color = C.Text,
+                    fontSize = AppType.title,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Text("  ${list.size}", color = C.Text3, fontSize = AppType.body, modifier = Modifier.padding(bottom = 2.dp))
             }
-            SearchField(query, onQuery, Modifier.fillMaxWidth().padding(bottom = 8.dp))
+            SearchField(query, onQuery, Modifier.fillMaxWidth().padding(bottom = AppSpace.sm))
         }
         if (list.isEmpty()) {
             Text(
                 if (query.isBlank()) stringResource(R.string.empty_group) else stringResource(R.string.nothing_found),
-                color = C.Text3, modifier = Modifier.padding(16.dp)
+                color = C.Text3,
+                fontSize = AppType.body,
+                modifier = Modifier.padding(AppSpace.lg),
             )
         }
-        LazyColumn(state = state, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
+        LazyColumn(
+            state = state,
+            contentPadding = PaddingValues(AppSpace.xs),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.weight(1f),
+        ) {
             itemsIndexed(list, key = { _, ch -> ch.key }) { i, ch ->
                 ChannelRow(
-                    vm, ch, now,
+                    vm = vm,
+                    ch = ch,
+                    now = now,
                     playing = ch.key == playing?.key,
                     fav = ch.key in fav,
                     match = matches[ch.key]?.takeIf { query.isNotBlank() },
@@ -356,41 +555,89 @@ private fun ChannelRow(
 ) {
     val epgVersion by vm.epgVersion.collectAsState()
     val minute = now / 60_000
-    val nn by produceState(emptyList<Programme>(), ch.key, epgVersion, minute) { value = vm.nowNext(ch) }
+    val cached = remember(ch.key, epgVersion, minute) { vm.peekNowNext(ch, now) }
+    val nn by produceState(cached.orEmpty(), ch.key, epgVersion, minute) {
+        if (cached == null) {
+            delay(30)
+            value = vm.nowNextCached(ch, now)
+        } else {
+            value = cached
+        }
+    }
     val cur = nn.firstOrNull { it.isNow(now) }
     FocusItem(
-        Modifier.fillMaxWidth(), selected = playing, focusRequester = focusRequester,
-        onFocus = onFocus, onLongClick = onLong, onClick = onClick,
+        Modifier.fillMaxWidth(),
+        selected = playing,
+        focusRequester = focusRequester,
+        shape = RoundedCornerShape(AppRadius.control),
+        onFocus = onFocus,
+        onLongClick = onLong,
+        onClick = onClick,
     ) { focused ->
-        Row(Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = AppSpace.sm, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+            SelectedBar(playing)
+            Spacer(Modifier.width(AppSpace.sm))
             Text(
-                ch.number.toString(), color = if (playing) C.Accent else C.Text3, fontSize = 13.sp,
-                modifier = Modifier.width(38.dp), maxLines = 1
+                ch.number.toString(),
+                color = if (playing) C.Accent2 else C.Text3,
+                fontSize = AppType.body,
+                fontWeight = if (playing) FontWeight.SemiBold else FontWeight.Normal,
+                modifier = Modifier.widthIn(min = 42.dp).padding(end = AppSpace.xs),
+                maxLines = 1,
             )
-            LogoImage(vm.logoOf(ch), ch.name, 34.dp)
-            Column(Modifier.weight(1f).padding(start = 12.dp)) {
+            LogoImage(vm.logoOf(ch), ch.name, 36.dp)
+            Column(Modifier.weight(1f).padding(start = AppSpace.md)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        ch.name, color = C.Text, fontSize = 16.sp, fontWeight = if (playing || focused) FontWeight.SemiBold else FontWeight.Normal,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)
+                        ch.name,
+                        color = C.Text,
+                        fontSize = AppType.subtitle,
+                        fontWeight = if (playing || focused) FontWeight.SemiBold else FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
-                    if (fav) Icon(Icons.Default.Star, null, tint = C.Accent2, modifier = Modifier.padding(start = 4.dp).size(14.dp))
-                    if (ch.hasArchive) Text(" ◷", color = C.Blue, fontSize = 13.sp)
-                    if (ch.variants.size > 1) Text(" ×${ch.variants.size}", color = C.Text3, fontSize = 12.sp)
+                    if (fav) Icon(Icons.Default.Star, null, tint = C.Accent2, modifier = Modifier.padding(start = AppSpace.xs).size(14.dp))
+                    if (ch.hasArchive) {
+                        Icon(
+                            painterResource(R.drawable.ic_archive),
+                            stringResource(R.string.archive_available),
+                            tint = C.Blue,
+                            modifier = Modifier.padding(start = AppSpace.xs).size(14.dp),
+                        )
+                    }
+                    if (ch.variants.size > 1) {
+                        Text(" ×${ch.variants.size}", color = C.Text3, fontSize = AppType.caption)
+                    }
                 }
                 if (match != null && match != cur) {
-                    Text("${hhmm(match.start)}  ${match.title}", color = C.Accent2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${hhmm(match.start)}  ${match.title}", color = C.Accent2, fontSize = AppType.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 } else if (cur != null) {
-                    Text(cur.title, color = C.Text2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    ProgressLine(cur.progress(now), Modifier.fillMaxWidth().padding(top = 4.dp), height = 2.dp)
-                    if (showNext) nn.firstOrNull { it.start > now }?.let { next ->
-                        Text(stringResource(R.string.next_programme_short, hhmm(next.start), next.title), color = C.Text3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(cur.title, color = C.Text2, fontSize = AppType.body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    ProgressLine(cur.progress(now), Modifier.fillMaxWidth().padding(top = AppSpace.xs), height = 3.dp)
+                    if (showNext) {
+                        nn.firstOrNull { it.start > now }?.let { next ->
+                            Text(
+                                stringResource(R.string.next_programme_short, hhmm(next.start), next.title),
+                                color = C.Text3,
+                                fontSize = AppType.caption,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 } else {
-                    Text(ch.group, color = C.Text3, fontSize = 12.sp, maxLines = 1)
+                    Text(groupLabel(ch.group), color = C.Text3, fontSize = AppType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-            if (playing) Text(stringResource(R.string.pill_live), color = C.Text2, fontSize = 12.sp, modifier = Modifier.padding(start = 8.dp))
+            if (playing) {
+                Pill(
+                    stringResource(R.string.pill_live),
+                    color = C.LiveBg,
+                    textColor = C.OnLive,
+                    modifier = Modifier.padding(start = AppSpace.sm),
+                )
+            }
         }
     }
 }
@@ -405,15 +652,22 @@ fun EpgPanel(
     onPlayLive: () -> Unit,
     onPlayArchive: (Programme) -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
     selectedProgramme: Programme? = null,
 ) {
     val epgVersion by vm.epgVersion.collectAsState()
     val archiveDays = ch.variants.maxOfOrNull { it.catchup?.days ?: 0.0 } ?: 0.0
     val from = now - (maxOf(archiveDays, 0.25) * 86_400_000).toLong()
+    val to = now + 3 * 86_400_000L
     val day = now / 86_400_000
-    val items by produceState<List<Programme>?>(null, ch.key, epgVersion, day, archiveDays) {
-        delay(120) // не дёргаем базу при быстрой прокрутке каналов
-        value = vm.schedule(ch, from, now + 3 * 86_400_000L)
+    val cachedSchedule = remember(ch.key, epgVersion, day, archiveDays) { vm.peekSchedule(ch, from, to) }
+    val items by produceState<List<Programme>?>(cachedSchedule, ch.key, epgVersion, day, archiveDays) {
+        if (cachedSchedule == null) {
+            delay(120) // не дёргаем базу при быстрой прокрутке каналов
+            value = vm.scheduleCached(ch, from, to)
+        } else {
+            value = cachedSchedule
+        }
     }
     val state = rememberLazyListState()
     val fr = remember { FocusRequester() }
@@ -426,114 +680,249 @@ fun EpgPanel(
     LaunchedEffect(items, focusCurrent, selectedProgramme) {
         if (list.isNotEmpty() && target >= 0) {
             state.scrollToItem((target - 2).coerceAtLeast(0))
-            if (focusCurrent) { delay(80); runCatching { fr.requestFocus() } }
+            if (focusCurrent) {
+                delay(80)
+                runCatching { fr.requestFocus() }
+            }
         }
     }
-    Column(modifier.clip(RoundedCornerShape(18.dp)).background(Color(0x99060A13)).padding(16.dp)) {
+    val archiveUnavailableMsg = stringResource(R.string.archive_unavailable)
+    val notStartedMsg = stringResource(R.string.programme_not_started)
+
+    Column(
+        modifier
+            .clip(RoundedCornerShape(AppRadius.card))
+            .background(C.PanelSolid)
+            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+            .padding(AppSpace.lg),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             LogoImage(vm.logoOf(ch), ch.name, 40.dp)
-            Column(Modifier.padding(start = 12.dp).weight(1f)) {
-                Text(ch.name, color = C.Text, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    if (archiveDays > 0) Pill(stringResource(R.string.archive_label, formatDays(archiveDays)), color = Color(0x334DA3FF), textColor = C.Blue)
-                    if (ch.variants.size > 1) Text(pluralStringResource(R.plurals.variants_count, ch.variants.size, ch.variants.size), color = C.Text3, fontSize = 12.sp)
+            Column(Modifier.padding(start = AppSpace.md).weight(1f)) {
+                Text(ch.name, color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = AppSpace.xs),
+                ) {
+                    if (archiveDays > 0) {
+                        Pill(stringResource(R.string.archive_label, formatDays(archiveDays)), color = C.Blue, textColor = C.OnInfo)
+                    }
+                    if (ch.variants.size > 1) {
+                        Text(pluralStringResource(R.plurals.variants_count, ch.variants.size, ch.variants.size), color = C.Text3, fontSize = AppType.caption)
+                    }
                 }
             }
         }
         // Ручной выбор источника: OK по источнику — играть канал с него (выбор запоминается)
         val playback by vm.controller.state.collectAsState()
         val playingThis = playback.channel?.key == ch.key
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 10.dp)) {
-            items(ch.variants.size, key = { i -> ch.variants.getOrNull(i)?.url ?: i }) { i ->
-                val v = ch.variants[i]
-                val active = playingThis && playback.channel?.variants?.getOrNull(playback.variantIndex)?.url == v.url
-                FocusItem(
-                    Modifier.clip(RoundedCornerShape(50)).background(if (active) C.Accent else C.Card),
-                    shape = RoundedCornerShape(50),
-                    onClick = { vm.selectVariant(ch, i) },
-                ) { _ ->
-                    Text(
-                        "${i + 1}. ${v.sourceName}", color = if (active) Color.White else C.Text2, fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
+        if (ch.variants.size > 1) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(AppSpace.xs),
+                contentPadding = PaddingValues(vertical = AppSpace.xs),
+                modifier = Modifier.padding(top = AppSpace.sm),
+            ) {
+                items(ch.variants.size, key = { i -> ch.variants.getOrNull(i)?.url ?: i }) { i ->
+                    val v = ch.variants[i]
+                    val active = playingThis && playback.channel?.variants?.getOrNull(playback.variantIndex)?.url == v.url
+                    FocusItem(
+                        containerColor = if (active) C.Accent else C.Card,
+                        borderColor = if (active) Color.Transparent else C.Border,
+                        prominent = active,
+                        liftOnFocus = true,
+                        shape = RoundedCornerShape(50),
+                        onClick = { vm.selectVariant(ch, i) },
+                    ) { _ ->
+                        Text(
+                            "${i + 1}. ${v.sourceName}",
+                            color = if (active) C.OnAccent else C.Text2,
+                            fontSize = AppType.caption,
+                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                            modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.xs),
+                        )
+                    }
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
-        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        Spacer(Modifier.height(AppSpace.sm))
+        val scope = rememberCoroutineScope()
         val selected = list.firstOrNull { it.start == focusedStart }
             ?: selectedProgramme
             ?: list.getOrNull(curIdx)?.takeIf { it.isNow(now) }
-        selected?.let { programme ->
-            Text(programme.title, color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text("${hhmm(programme.start)} – ${hhmm(programme.stop)}", color = C.Text2, fontSize = 14.sp)
-            programme.desc?.takeIf { it.isNotBlank() }?.let { Text(it, color = C.Text2, fontSize = 14.sp, maxLines = 3, overflow = TextOverflow.Ellipsis) }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (curIdx >= 0) FocusItem(onClick = {
-                focusedStart = list[curIdx].start
-                scope.launch { state.scrollToItem(curIdx) }
-            }) { _ -> Text(stringResource(R.string.action_now), color = C.Accent2, modifier = Modifier.padding(8.dp)) }
-            if (selected != null && ch.variants.any {
-                    StreamResolver.catchupUrl(it, selected.start, selected.stop, now) != null
-                }) FocusItem(onClick = { onPlayArchive(selected) }) { _ ->
-                Text(stringResource(R.string.action_from_start), color = C.Accent2, modifier = Modifier.padding(8.dp))
+        if (!compact && selected != null) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(AppRadius.panel))
+                    .background(C.Card)
+                    .border(1.dp, C.Border, RoundedCornerShape(AppRadius.panel))
+                    .padding(AppSpace.md),
+            ) {
+                Text(selected.title, color = C.Text, fontSize = AppType.subtitle, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${hhmm(selected.start)} – ${hhmm(selected.stop)}", color = C.Accent2, fontSize = AppType.caption, modifier = Modifier.padding(top = AppSpace.xs))
+                selected.desc?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = C.Text2, fontSize = AppType.body, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = AppSpace.xs))
+                }
             }
-            FocusItem(onClick = onPlayLive) { _ ->
-                Text(stringResource(R.string.action_back_to_live), color = C.Accent2, modifier = Modifier.padding(8.dp))
+            Spacer(Modifier.height(AppSpace.sm))
+        }
+        val playableSelected = selected?.takeIf { s ->
+            ch.variants.any { StreamResolver.catchupUrl(it, s.start, s.stop, now) != null }
+        }
+        val showBackToLive = !playingThis || playback.archive != null
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
+            contentPadding = PaddingValues(vertical = AppSpace.xs),
+        ) {
+            if (curIdx >= 0) {
+                item {
+                    FocusItem(
+                        containerColor = C.Card,
+                        borderColor = C.Border,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        onClick = {
+                            focusedStart = list[curIdx].start
+                            scope.launch { state.scrollToItem(curIdx) }
+                        },
+                    ) { _ ->
+                        Text(stringResource(R.string.action_now), color = C.Text, fontSize = AppType.caption, modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm))
+                    }
+                }
+            }
+            if (playableSelected != null) {
+                item {
+                    FocusItem(
+                        containerColor = C.Accent,
+                        prominent = true,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        onClick = { onPlayArchive(playableSelected) },
+                    ) { _ ->
+                        Text(
+                            stringResource(R.string.action_from_start),
+                            color = C.OnAccent,
+                            fontSize = AppType.caption,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
+                        )
+                    }
+                }
+            }
+            if (showBackToLive) {
+                item {
+                    FocusItem(
+                        containerColor = C.Card,
+                        borderColor = C.Border,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        onClick = onPlayLive,
+                    ) { _ ->
+                        Text(stringResource(R.string.action_back_to_live), color = C.Accent2, fontSize = AppType.caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm))
+                    }
+                }
             }
         }
+        Spacer(Modifier.height(AppSpace.xs))
         when {
-            items == null -> Text(stringResource(R.string.loading_guide), color = C.Text3)
+            items == null -> Text(stringResource(R.string.loading_guide), color = C.Text3, fontSize = AppType.body, modifier = Modifier.padding(vertical = AppSpace.sm))
             list.isEmpty() -> Text(
                 if (vm.epg.isEmpty) stringResource(R.string.guide_not_loaded) else stringResource(R.string.no_programme),
-                color = C.Text3
+                color = C.Text3,
+                fontSize = AppType.body,
+                modifier = Modifier.padding(vertical = AppSpace.sm),
             )
         }
-        LazyColumn(state = state, verticalArrangement = Arrangement.spacedBy(2.dp), modifier = Modifier.weight(1f)) {
-            itemsIndexed(list, key = { _, p -> "${p.start}_${p.stop}_${p.title}" }) { i, p -> Column {
-                val prevDay = list.getOrNull(i - 1)?.let { dayTitle(it.start) }
-                val thisDay = dayTitle(p.start)
-                if (prevDay != thisDay) {
-                    Text(thisDay, color = C.Accent2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 10.dp, top = 10.dp, bottom = 4.dp))
-                }
-                val isNow = p.isNow(now)
-                val past = p.stop <= now
-                val canArchive = past && ch.variants.any {
-                    StreamResolver.catchupUrl(it, p.start, p.stop, now) != null
-                }
-                FocusItem(
-                    Modifier.fillMaxWidth(), selected = isNow,
-                    focusRequester = if (i == target) fr else null,
-                    onFocus = { focusedStart = p.start },
-                    onClick = { if (isNow) onPlayLive() else if (canArchive) onPlayArchive(p) },
-                ) { focused ->
-                    Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(hhmm(p.start), color = if (isNow) C.Accent else if (past) C.Text3 else C.Text2, fontSize = 14.sp, modifier = Modifier.width(52.dp))
-                            Text(
-                                p.title, color = if (past && !canArchive) C.Text3 else C.Text, fontSize = 15.sp,
-                                fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal,
-                                maxLines = if (focused) 2 else 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
-                            )
-                            val archiveDesc = stringResource(R.string.archive_available)
-                            if (canArchive) Text(
-                                "◷", color = C.Blue, fontSize = 14.sp,
-                                modifier = Modifier.semantics { contentDescription = archiveDesc },
-                            )
-                            if (isNow) Pill(stringResource(R.string.pill_live), color = C.Red, textColor = Color.White)
-                        }
-                        if (isNow) ProgressLine(p.progress(now), Modifier.fillMaxWidth().padding(start = 52.dp, top = 6.dp))
-                        val desc = p.desc
-                        if ((focused || isNow) && !desc.isNullOrBlank()) {
-                            Text(
-                                desc, color = C.Text3, fontSize = 13.sp, maxLines = if (focused) 6 else 2, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(start = 52.dp, top = 4.dp)
-                            )
+        LazyColumn(
+            state = state,
+            contentPadding = PaddingValues(AppSpace.xs),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.weight(1f),
+        ) {
+            itemsIndexed(list, key = { _, p -> "${p.start}_${p.stop}_${p.title}" }) { i, p ->
+                Column {
+                    val prevDay = list.getOrNull(i - 1)?.let { dayTitle(it.start) }
+                    val thisDay = dayTitle(p.start)
+                    if (prevDay != thisDay) {
+                        Text(
+                            thisDay,
+                            color = C.Accent2,
+                            fontSize = AppType.caption,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(start = AppSpace.sm, top = AppSpace.md, bottom = AppSpace.xs),
+                        )
+                    }
+                    val isNow = p.isNow(now)
+                    val past = p.stop <= now
+                    val canArchive = past && ch.variants.any {
+                        StreamResolver.catchupUrl(it, p.start, p.stop, now) != null
+                    }
+                    FocusItem(
+                        Modifier.fillMaxWidth(),
+                        selected = isNow,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        focusRequester = if (i == target) fr else null,
+                        onFocus = { focusedStart = p.start },
+                        onClick = {
+                            when {
+                                isNow -> onPlayLive()
+                                canArchive -> onPlayArchive(p)
+                                past -> vm.show(archiveUnavailableMsg)
+                                else -> vm.show(notStartedMsg)
+                            }
+                        },
+                    ) { focused ->
+                        Column(Modifier.padding(horizontal = AppSpace.sm, vertical = AppSpace.sm)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                SelectedBar(isNow)
+                                Spacer(Modifier.width(AppSpace.xs))
+                                Text(
+                                    hhmm(p.start),
+                                    color = if (isNow) C.Accent2 else if (past) C.Text3 else C.Text2,
+                                    fontSize = AppType.body,
+                                    modifier = Modifier.width(48.dp),
+                                )
+                                Text(
+                                    p.title,
+                                    color = if (past && !canArchive) C.Text3 else C.Text,
+                                    fontSize = AppType.body,
+                                    fontWeight = if (isNow) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = if (focused) 2 else 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                if (canArchive) {
+                                    Icon(
+                                        painterResource(R.drawable.ic_archive),
+                                        stringResource(R.string.archive_available),
+                                        tint = C.Blue,
+                                        modifier = Modifier.padding(start = AppSpace.xs).size(14.dp),
+                                    )
+                                }
+                                if (isNow) {
+                                    Pill(
+                                        stringResource(R.string.pill_live),
+                                        color = C.LiveBg,
+                                        textColor = C.OnLive,
+                                        modifier = Modifier.padding(start = AppSpace.xs),
+                                    )
+                                }
+                            }
+                            if (isNow) {
+                                ProgressLine(p.progress(now), Modifier.fillMaxWidth().padding(start = 54.dp, top = AppSpace.xs))
+                            }
+                            if (compact && focused && !p.desc.isNullOrBlank()) {
+                                Text(
+                                    p.desc.orEmpty(),
+                                    color = C.Text3,
+                                    fontSize = AppType.caption,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(start = 54.dp, top = AppSpace.xs),
+                                )
+                            }
                         }
                     }
                 }
-            } }
+            }
         }
     }
 }
