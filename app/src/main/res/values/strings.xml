@@ -80,7 +80,7 @@
 
     <!-- Settings screen -->
     <string name="settings_title">Настройки</string>
-    <string name="back_to_playback">← Назад к просмотру</string>
+    <string name="back_to_playback">Назад к просмотру</string>
     <string name="section_playlists">Плейлисты</string>
     <string name="section_channels">Каналы</string>
     <string name="section_epg">Телепрограмма</string>
@@ -89,6 +89,12 @@
     <string name="section_appearance">Оформление</string>
     <string name="section_about">О приложении</string>
 
+    <string name="appearance_interface_header">Интерфейс</string>
+    <string name="appearance_interface_desc">Стартовый экран, предпросмотр каналов и режим отображения.</string>
+    <string name="ui_mode_title">Режим интерфейса</string>
+    <string name="ui_mode_auto">Авто</string>
+    <string name="ui_mode_tv">Android TV</string>
+    <string name="ui_mode_phone">Телефон</string>
     <string name="appearance_header">Акцентный цвет</string>
     <string name="appearance_header_desc">Кнопки, фокус, выделение каналов и полосы прогресса. Применяется сразу ко всем экранам.</string>
     <string name="accent_violet">Индиго</string>
@@ -99,17 +105,17 @@
     <string name="accent_red">Красный</string>
 
     <string name="sources_header">Источники каналов</string>
-    <string name="sources_header_desc">Как TVSources в SimpleTV: каналы из разных источников объединяются, при ошибке берётся следующий.</string>
+    <string name="sources_header_desc">Каналы из включённых источников объединяются: при сбое одного плеер автоматически переключится на резервный.</string>
     <string name="check_streams">Проверять потоки</string>
-    <string name="check_streams_desc">HEAD 4 с → GET 6 с, как check.lua (долго)</string>
+    <string name="check_streams_desc">Проверять доступность потоков при обновлении (может занять несколько минут)</string>
     <string name="action_delete_source">Удалить источник</string>
-    <string name="action_add_playlist">＋ Добавить плейлист по ссылке</string>
+    <string name="action_add_playlist">Добавить плейлист по ссылке</string>
     <string name="add_playlist_desc">M3U/M3U8, можно указать свой User-Agent</string>
     <string name="dialog_new_playlist">Новый плейлист</string>
     <string name="field_name">Название</string>
     <string name="field_link_m3u">Ссылка на m3u</string>
     <string name="field_ua_optional">User-Agent (необязательно)</string>
-    <string name="action_refresh_playlists">⟳ Обновить плейлисты сейчас</string>
+    <string name="action_refresh_playlists">Обновить плейлисты сейчас</string>
     <string name="auto_update_channels">Автообновление каналов</string>
     <plurals name="auto_update_days">
         <item quantity="one">раз в %1$d день</item>
@@ -139,15 +145,15 @@
     <string name="reverse_zap_desc">По умолчанию: ▲ следующий канал (+1), ▼ предыдущий (-1). Включите, если привыкли к обратному</string>
 
     <string name="epg_header">Источники телепрограммы (XMLTV)</string>
-    <string name="epg_header_desc">Из work/config.ini [epg]. Включено несколько — объединяются по порядку. При смене источника база перестраивается сама.</string>
+    <string name="epg_header_desc">При включении нескольких источников они объединяются по порядку, база обновляется автоматически.</string>
     <string name="action_delete">Удалить</string>
-    <string name="action_add_epg">＋ Добавить источник EPG</string>
+    <string name="action_add_epg">Добавить источник EPG</string>
     <string name="add_epg_desc">Ссылка на xml или xml.gz</string>
     <string name="dialog_epg_source">Источник телепрограммы</string>
     <string name="field_link">Ссылка</string>
-    <string name="action_refresh_epg">⟳ Обновить телепрограмму</string>
+    <string name="action_refresh_epg">Обновить телепрограмму</string>
     <string name="action_clear_epg">Очистить базу и загрузить заново</string>
-    <string name="clear_epg_desc">Аналог кнопки «Очистить БД» в SimpleTV</string>
+    <string name="clear_epg_desc">Удалить локальную базу программы передач и загрузить заново</string>
     <string name="auto_update_epg">Автообновление программы</string>
     <plurals name="auto_update_epg_desc">
         <item quantity="one">раз в %1$d день (сервер проверяется по ETag)</item>
@@ -173,20 +179,19 @@
     <string name="ua_check">check.lua — проверка потоков</string>
 
     <string name="playback_header">Воспроизведение</string>
-    <string name="playback_header_desc">Буфер — аналог net\\cache\\httpftp=4000 из config.ini. Применяется после перезапуска.</string>
+    <string name="playback_header_desc">Размер сетевого буфера для сглаживания нестабильного соединения. Применяется после перезапуска.</string>
     <string name="buffer_title">Буфер сети</string>
     <string name="buffer_value">%1$d мс</string>
-    <string name="remote_help">Пульт: ▲▼ — переключение каналов, OK или ◀ — список каналов, ▶ — телепрограмма, цифры — номер канала, «Меню» — качество и источник потока, долгое OK в списке — избранное.\nТелефон: касание — панель управления, свайп вверх/вниз — следующий/предыдущий канал.</string>
+    <string name="remote_help">Пульт TV: ▲▼ — каналы, OK или ◀ — список каналов, ▶ — телегид, ◀▶ в архиве — перемотка ±30 с, цифры — номер канала, «Меню» — поток и качество.\nВ списке: долгое OK — избранное.\nТелефон: касание — панель, свайп вверх/вниз — каналы.</string>
 
-    <string name="about_header">Android/Android TV-плеер IPTV</string>
-    <string name="about_body">• Встроенные плейлисты: Beeline и Wink TV. Дополнительные источники можно добавить в настройках.\n• Ссылки Wink/Beeline раскодируются так же, как в видеоскриптах Nexterr: base64 → reverse → base64, ключ ClearKey из token= или decryption_key.\n• Телепрограмма: iptvx.one lite, дополнительные источники доступны в настройках.\n• Архив: Wink ?offset=-N, Beeline ?starttime&amp;stoptime, остальные — по catchup-source.\n• Объединение одинаковых каналов и автопереключение источника при ошибке — как в TVSources.</string>
+    <string name="about_header">Android / Android TV-плеер IPTV</string>
+    <string name="about_body">• Встроенные источники ТВ и открытые каталоги, плюс поддержка собственных M3U-плейлистов.\n• Объединение одинаковых каналов и автоматическое переключение на резервный источник при сбое.\n• Телепрограмма XMLTV, поиск по передачам и просмотр архива (при наличии у канала).\n• Оптимизировано для пульта Android TV, телефонов и десктопа.</string>
 
     <string name="status_never">ещё не обновлялось</string>
     <string name="status_last">последнее: %1$s</string>
     <string name="presets">Пресеты</string>
     <string name="action_save">Сохранить</string>
     <string name="action_cancel">Отмена</string>
-    <string name="action_back">←</string>
 
     <!-- Channel list and guide -->
     <string name="back_to_search">‹ К результатам поиска</string>
@@ -309,6 +314,7 @@
     <string name="preset_exoplayer">Android ExoPlayer</string>
     <string name="epgsrc_iptvx_lite">iptvx.one lite (лёгкая, без описаний)</string>
     <string name="epgsrc_epgpw">epg.pw RU (3 дня, без прошедших)</string>
+    <string name="epgsrc_teleguide">teleguide.info</string>
     <string name="epgsrc_programtv">programtv.ru (мини)</string>
     <string name="epgsrc_iptvx">iptvx.one полная</string>
     <string name="epgsrc_edem">epg.one (edem)</string>

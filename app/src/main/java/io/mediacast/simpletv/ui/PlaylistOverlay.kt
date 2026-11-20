@@ -485,9 +485,11 @@ private fun ChannelsColumn(
     // Начальный фокус при открытии оверлея или явном подтверждении (OK) группы.
     LaunchedEffect(focusCurrent, focusChannelsNonce) {
         if (!focusCurrent && focusChannelsNonce == 0) return@LaunchedEffect
-        if (list.isNotEmpty()) state.scrollToItem((target - 4).coerceAtLeast(0))
-        delay(80)
-        runCatching { fr.requestFocus() }
+        if (list.isNotEmpty()) {
+            state.scrollToItem((target - 4).coerceAtLeast(0))
+            delay(80)
+            runCatching { fr.requestFocus() }
+        }
     }
 
     Column(modifier) {

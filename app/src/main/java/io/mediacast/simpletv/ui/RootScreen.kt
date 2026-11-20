@@ -298,7 +298,7 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
             .onKeyEvent(::onKey),
     ) {
         val portrait = !inPip && !isTv && maxHeight > maxWidth
-        val wide = !portrait && (isTv || maxWidth >= 840.dp)
+        val wide = !portrait && maxWidth >= 600.dp && (isTv || maxWidth >= 840.dp)
         val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
         val portraitBar = 56.dp + topInset
         val videoArea = if (portrait) {
@@ -357,7 +357,7 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
             }
         }
 
-        if (loaded && channels.isEmpty()) {
+        if (loaded && channels.isEmpty() && overlay == Overlay.NONE) {
             Welcome(
                 busy = plsBusy,
                 onRefresh = { vm.refreshPlaylists() },
@@ -521,7 +521,7 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
             }
         }
 
-        if (overlay == Overlay.SETTINGS) SettingsScreen(vm, wide, onClose = { vm.closeOverlay() })
+        if (overlay == Overlay.SETTINGS) SettingsScreen(vm, isTv, wide, onClose = { vm.closeOverlay() })
 
         if (portrait && overlay == Overlay.NONE && channels.isNotEmpty()) {
             Box(

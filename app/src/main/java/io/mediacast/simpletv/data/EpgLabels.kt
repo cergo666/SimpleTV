@@ -11,6 +11,7 @@ import io.mediacast.simpletv.R
 fun Context.epgSourceLabel(source: EpgSource): String = when (source.id) {
     "iptvx_lite" -> getString(R.string.epgsrc_iptvx_lite)
     "epgpw" -> getString(R.string.epgsrc_epgpw)
+    "teleguide" -> getString(R.string.epgsrc_teleguide)
     "programtv" -> getString(R.string.epgsrc_programtv)
     "iptvx" -> getString(R.string.epgsrc_iptvx)
     "edem" -> getString(R.string.epgsrc_edem)

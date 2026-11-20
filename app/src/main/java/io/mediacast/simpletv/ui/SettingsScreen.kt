@@ -1,25 +1,44 @@
 package io.mediacast.simpletv.ui
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
@@ -37,27 +56,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.runtime.key
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
+import io.mediacast.simpletv.BuildConfig
 import io.mediacast.simpletv.R
-import io.mediacast.simpletv.data.SourceConfig
-import io.mediacast.simpletv.data.EpgSource
-import io.mediacast.simpletv.data.SourceType
 import io.mediacast.simpletv.data.UserAgents
-import android.content.Context
+import kotlinx.coroutines.delay
 import java.util.Date
-import java.util.Locale
 
 private class EditRequest(
     val title: String,
@@ -68,7 +83,7 @@ private class EditRequest(
 )
 
 @Composable
-fun SettingsScreen(vm: MainViewModel, wide: Boolean, onClose: () -> Unit) {
+fun SettingsScreen(vm: MainViewModel, isTv: Boolean, wide: Boolean, onClose: () -> Unit) {
     val sections = listOf(
         stringResource(R.string.section_playlists),
         stringResource(R.string.section_channels),
@@ -80,64 +95,143 @@ fun SettingsScreen(vm: MainViewModel, wide: Boolean, onClose: () -> Unit) {
     )
     var section by rememberSaveable { mutableIntStateOf(0) }
     var edit by remember { mutableStateOf<EditRequest?>(null) }
-    var revision by remember { mutableIntStateOf(0) } // перерисовка после изменения SharedPreferences
-    val bump: () -> Unit = { revision++ }
+    val bump: () -> Unit = { vm.notifySettingsChanged() }
     BackHandler { if (edit != null) edit = null else onClose() }
     val firstFr = remember { FocusRequester() }
-    LaunchedEffect(Unit) { delay(80); runCatching { firstFr.requestFocus() } }
+    LaunchedEffect(Unit) {
+        delay(80)
+        runCatching { firstFr.requestFocus() }
+    }
 
     Box(Modifier.fillMaxSize().background(C.Bg.copy(alpha = 0.97f))) {
         val content: @Composable (Modifier) -> Unit = { m ->
-            key(revision) {
-                Column(m) {
-                    when (section) {
-                        0 -> PlaylistsSection(vm, bump) { edit = it }
-                        1 -> ChannelsSection(vm, bump)
-                        2 -> EpgSection(vm, bump) { edit = it }
-                        3 -> UaSection(vm, bump) { edit = it }
-                        4 -> PlaybackSection(vm, bump)
-                        5 -> AppearanceSection(vm, bump)
-                        else -> AboutSection()
-                    }
+            Column(m) {
+                when (section) {
+                    0 -> PlaylistsSection(vm, bump) { edit = it }
+                    1 -> ChannelsSection(vm, bump)
+                    2 -> EpgSection(vm, bump) { edit = it }
+                    3 -> UaSection(vm, bump) { edit = it }
+                    4 -> PlaybackSection(vm, bump)
+                    5 -> AppearanceSection(vm, isTv, bump)
+                    else -> AboutSection()
                 }
             }
         }
         if (wide) {
-            Row(Modifier.fillMaxSize().padding(32.dp)) {
+            Row(
+                Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (isTv) Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
+                        else Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(AppSpace.xl),
+                    ),
+            ) {
                 Column(Modifier.width(260.dp).fillMaxHeight()) {
-                    Text(stringResource(R.string.settings_title), color = C.Text, fontSize = 26.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 12.dp, bottom = 16.dp))
+                    Text(
+                        stringResource(R.string.settings_title),
+                        color = C.Text,
+                        fontSize = AppType.display,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = AppSpace.sm, bottom = AppSpace.lg),
+                    )
                     sections.forEachIndexed { i, s ->
+                        val isSelected = i == section
                         FocusItem(
-                            Modifier.fillMaxWidth().padding(vertical = 2.dp), selected = i == section,
+                            Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            selected = isSelected,
+                            shape = RoundedCornerShape(AppRadius.control),
                             focusRequester = if (i == 0) firstFr else null,
-                            onFocus = { section = i }, onClick = { section = i },
-                        ) { _ -> Text(s, color = if (i == section) C.Text else C.Text2, fontSize = 17.sp, modifier = Modifier.padding(14.dp)) }
+                            onFocus = { section = i },
+                            onClick = { section = i },
+                        ) { _ ->
+                            Row(
+                                Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                SelectedBar(isSelected)
+                                Spacer(Modifier.width(AppSpace.sm))
+                                Text(
+                                    s,
+                                    color = if (isSelected) C.Text else C.Text2,
+                                    fontSize = AppType.subtitle,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            }
+                        }
                     }
                     Spacer(Modifier.weight(1f))
-                    FocusItem(Modifier.fillMaxWidth(), onClick = onClose) { _ ->
-                        Text(stringResource(R.string.back_to_playback), color = C.Text2, fontSize = 16.sp, modifier = Modifier.padding(14.dp))
+                    FocusItem(
+                        Modifier.fillMaxWidth(),
+                        containerColor = C.Card,
+                        borderColor = C.Border,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        onClick = onClose,
+                    ) { _ ->
+                        Row(
+                            Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = C.Text2, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(AppSpace.sm))
+                            Text(stringResource(R.string.back_to_playback), color = C.Text, fontSize = AppType.body)
+                        }
                     }
                 }
-                Spacer(Modifier.width(24.dp))
+                Spacer(Modifier.width(AppSpace.xl))
                 content(Modifier.weight(1f).fillMaxHeight())
             }
         } else {
-            Column(Modifier.fillMaxSize().padding(12.dp)) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(AppSpace.md),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    FocusItem(onClick = onClose, focusRequester = firstFr) { _ -> Text(stringResource(R.string.action_back), color = C.Text, fontSize = 22.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) }
-                    Text(stringResource(R.string.settings_title), color = C.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    FocusItem(Modifier.size(48.dp), shape = CircleShape, focusRequester = firstFr, onClick = onClose) { _ ->
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            stringResource(R.string.action_close),
+                            tint = C.Text,
+                            modifier = Modifier.align(Alignment.Center),
+                        )
+                    }
+                    Spacer(Modifier.width(AppSpace.xs))
+                    Text(stringResource(R.string.settings_title), color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold)
                 }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
+                    contentPadding = PaddingValues(vertical = AppSpace.sm),
+                ) {
                     items(sections.size) { i ->
-                        FocusItem(selected = i == section, onClick = { section = i }) { _ ->
-                            Text(sections[i], color = if (i == section) C.Text else C.Text2, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                        val isSelected = i == section
+                        FocusItem(
+                            selected = isSelected,
+                            containerColor = if (isSelected) C.Accent else C.Card,
+                            borderColor = if (isSelected) Color.Transparent else C.Border,
+                            shape = RoundedCornerShape(50),
+                            onClick = { section = i },
+                        ) { _ ->
+                            Text(
+                                sections[i],
+                                color = if (isSelected) C.OnAccent else C.Text2,
+                                fontSize = AppType.body,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
+                            )
                         }
                     }
                 }
                 content(Modifier.weight(1f))
             }
         }
-        edit?.let { req -> EditDialog(req, onCancel = { edit = null }) { values -> req.onDone(values); edit = null; bump() } }
+        edit?.let { req ->
+            EditDialog(req, isTv = isTv, onCancel = { edit = null }) { values ->
+                req.onDone(values)
+                edit = null
+                bump()
+            }
+        }
     }
 }
 
@@ -146,22 +240,45 @@ fun SettingsScreen(vm: MainViewModel, wide: Boolean, onClose: () -> Unit) {
 @Composable
 private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
     val busy by vm.playlistBusy.collectAsState()
+    val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
+    val sources = remember(revision) { s.sources }
+    val intervalDays = s.playlistIntervalDays
+    val skipWeb = s.skipWebPages
     val context = LocalContext.current
+    val statusText = status(context, s.lastPlaylistUpdate, s.playlistStatus)
     val invalidUrl = stringResource(R.string.error_invalid_url)
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+
+    LazyColumn(
+        contentPadding = PaddingValues(AppSpace.xs),
+        verticalArrangement = Arrangement.spacedBy(AppSpace.sm),
+    ) {
         item { Header(stringResource(R.string.sources_header), stringResource(R.string.sources_header_desc)) }
-        items(s.sources, key = { it.id }) { src ->
+        items(sources, key = { it.id }) { src ->
             SettingCard {
-                ToggleRow(src.name, src.urls.joinToString("\n") + (src.streamUserAgent?.let { "\nUA: $it" } ?: ""), src.enabled) {
-                    vm.updateSource(src.copy(enabled = !src.enabled)); bump()
+                ToggleRow(
+                    src.name,
+                    src.urls.joinToString("\n") + (src.streamUserAgent?.let { "\nUA: $it" } ?: ""),
+                    src.enabled,
+                    inCard = true,
+                ) {
+                    vm.updateSource(src.copy(enabled = !src.enabled))
+                    bump()
                 }
-                if (src.type == SourceType.AGGREGATOR) {
-                    ToggleRow(stringResource(R.string.check_streams), stringResource(R.string.check_streams_desc), src.checkStreams) {
-                        vm.updateSource(src.copy(checkStreams = !src.checkStreams)); bump()
+                if (src.type == io.mediacast.simpletv.data.SourceType.AGGREGATOR) {
+                    HorizontalDivider(color = C.Divider)
+                    ToggleRow(stringResource(R.string.check_streams), stringResource(R.string.check_streams_desc), src.checkStreams, inCard = true) {
+                        vm.updateSource(src.copy(checkStreams = !src.checkStreams))
+                        bump()
                     }
                 }
-                if (!src.builtIn) ActionRow(stringResource(R.string.action_delete_source), null) { vm.removeSource(src); bump() }
+                if (!src.builtIn) {
+                    HorizontalDivider(color = C.Divider)
+                    ActionRow(stringResource(R.string.action_delete_source), null, icon = Icons.Default.Delete, inCard = true) {
+                        vm.removeSource(src)
+                        bump()
+                    }
+                }
             }
         }
         item {
@@ -176,21 +293,28 @@ private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditR
                 if (v[1].trim().length > 8) vm.addSource(v[0], v[1], v[2])
                 else vm.show(invalidUrl)
             }
-            ActionRow(stringResource(R.string.action_add_playlist), stringResource(R.string.add_playlist_desc)) {
+            ActionRow(stringResource(R.string.action_add_playlist), stringResource(R.string.add_playlist_desc), icon = Icons.Default.Add) {
                 onEdit(request)
             }
         }
         item {
-            ActionRow(busy ?: stringResource(R.string.action_refresh_playlists), status(context, s.lastPlaylistUpdate, s.playlistStatus)) { vm.refreshPlaylists() }
-        }
-        item {
-            CycleRow(stringResource(R.string.auto_update_channels), pluralStringResource(R.plurals.auto_update_days, s.playlistIntervalDays, s.playlistIntervalDays)) {
-                s.playlistIntervalDays = next(listOf(1, 3, 7, 14), s.playlistIntervalDays); bump()
+            ActionRow(busy ?: stringResource(R.string.action_refresh_playlists), statusText, icon = Icons.Default.Refresh) {
+                vm.refreshPlaylists()
             }
         }
         item {
-            ToggleRow(stringResource(R.string.skip_web_title), stringResource(R.string.skip_web_desc), s.skipWebPages) {
-                s.skipWebPages = !s.skipWebPages; bump()
+            CycleRow(
+                stringResource(R.string.auto_update_channels),
+                pluralStringResource(R.plurals.auto_update_days, intervalDays, intervalDays),
+            ) {
+                s.playlistIntervalDays = next(listOf(1, 3, 7, 14), intervalDays)
+                bump()
+            }
+        }
+        item {
+            ToggleRow(stringResource(R.string.skip_web_title), stringResource(R.string.skip_web_desc), skipWeb) {
+                s.skipWebPages = !skipWeb
+                bump()
             }
         }
     }
@@ -198,56 +322,67 @@ private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditR
 
 @Composable
 private fun ChannelsSection(vm: MainViewModel, bump: () -> Unit) {
+    val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
-    fun toggle(set: () -> Unit) { set(); vm.reapplyFilters(); bump() }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val hideSd = remember(revision) { s.hideSdDuplicates }
+    val mergeOtt = remember(revision) { s.mergeOtt }
+    val hideTz = remember(revision) { s.hideTimezones }
+    val hideAdult = remember(revision) { s.hideAdult }
+    val preferMax = remember(revision) { s.preferMaxQuality }
+    val hdGroups = remember(revision) { s.hdGroups }
+    val standardOrder = remember(revision) { s.standardOrder }
+    val reverseZap = remember(revision) { s.reverseZap }
+
+    fun toggle(set: () -> Unit) {
+        set()
+        vm.reapplyFilters()
+        bump()
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(AppSpace.xs),
+        verticalArrangement = Arrangement.spacedBy(AppSpace.sm),
+    ) {
         item { Header(stringResource(R.string.channels_header), stringResource(R.string.channels_header_desc)) }
         item {
-            ToggleRow(stringResource(R.string.hide_sd_title), stringResource(R.string.hide_sd_desc), s.hideSdDuplicates) {
-                toggle { s.hideSdDuplicates = !s.hideSdDuplicates }
+            ToggleRow(stringResource(R.string.hide_sd_title), stringResource(R.string.hide_sd_desc), hideSd) {
+                toggle { s.hideSdDuplicates = !hideSd }
             }
         }
         item {
-            ToggleRow(
-                stringResource(R.string.merge_ott_title),
-                stringResource(R.string.merge_ott_desc),
-                s.mergeOtt
-            ) {
-                toggle { s.mergeOtt = !s.mergeOtt }
+            ToggleRow(stringResource(R.string.merge_ott_title), stringResource(R.string.merge_ott_desc), mergeOtt) {
+                toggle { s.mergeOtt = !mergeOtt }
             }
         }
         item {
-            ToggleRow(stringResource(R.string.hide_tz_title), stringResource(R.string.hide_tz_desc), s.hideTimezones) {
-                toggle { s.hideTimezones = !s.hideTimezones }
+            ToggleRow(stringResource(R.string.hide_tz_title), stringResource(R.string.hide_tz_desc), hideTz) {
+                toggle { s.hideTimezones = !hideTz }
             }
         }
         item {
-            ToggleRow(stringResource(R.string.hide_adult_title), stringResource(R.string.hide_adult_desc), s.hideAdult) {
-                toggle { s.hideAdult = !s.hideAdult }
+            ToggleRow(stringResource(R.string.hide_adult_title), stringResource(R.string.hide_adult_desc), hideAdult) {
+                toggle { s.hideAdult = !hideAdult }
             }
         }
         item {
-            ToggleRow(stringResource(R.string.prefer_max_title), stringResource(R.string.prefer_max_desc), s.preferMaxQuality) {
-                toggle { s.preferMaxQuality = !s.preferMaxQuality }
+            ToggleRow(stringResource(R.string.prefer_max_title), stringResource(R.string.prefer_max_desc), preferMax) {
+                toggle { s.preferMaxQuality = !preferMax }
             }
         }
         item {
-            ToggleRow(stringResource(R.string.hd_groups_title), null, s.hdGroups) { toggle { s.hdGroups = !s.hdGroups } }
+            ToggleRow(stringResource(R.string.hd_groups_title), null, hdGroups) {
+                toggle { s.hdGroups = !hdGroups }
+            }
         }
         item {
-            ToggleRow(
-                stringResource(R.string.standard_order_title),
-                stringResource(R.string.standard_order_desc),
-                s.standardOrder
-            ) { toggle { s.standardOrder = !s.standardOrder } }
+            ToggleRow(stringResource(R.string.standard_order_title), stringResource(R.string.standard_order_desc), standardOrder) {
+                toggle { s.standardOrder = !standardOrder }
+            }
         }
         item {
-            ToggleRow(
-                stringResource(R.string.reverse_zap_title),
-                stringResource(R.string.reverse_zap_desc),
-                s.reverseZap
-            ) {
-                s.reverseZap = !s.reverseZap; bump()
+            ToggleRow(stringResource(R.string.reverse_zap_title), stringResource(R.string.reverse_zap_desc), reverseZap) {
+                s.reverseZap = !reverseZap
+                bump()
             }
         }
     }
@@ -256,16 +391,24 @@ private fun ChannelsSection(vm: MainViewModel, bump: () -> Unit) {
 @Composable
 private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
     val busy by vm.epgBusy.collectAsState()
+    val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
+    val epgSources = remember(revision) { s.epgSources }
+    val intervalDays = s.epgIntervalDays
     val context = LocalContext.current
+    val statusText = status(context, s.lastEpgUpdate, s.epgStatus)
     val invalidUrl = stringResource(R.string.error_invalid_url)
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+
+    LazyColumn(
+        contentPadding = PaddingValues(AppSpace.xs),
+        verticalArrangement = Arrangement.spacedBy(AppSpace.sm),
+    ) {
         item { Header(stringResource(R.string.epg_header), stringResource(R.string.epg_header_desc)) }
-        items(s.epgSources, key = { it.id }) { src ->
-            // Подписи встроенных источников переводятся по стабильному id
+        items(epgSources, key = { it.id }) { src ->
             val label = when (src.id) {
                 "iptvx_lite" -> stringResource(R.string.epgsrc_iptvx_lite)
                 "epgpw" -> stringResource(R.string.epgsrc_epgpw)
+                "teleguide" -> stringResource(R.string.epgsrc_teleguide)
                 "programtv" -> stringResource(R.string.epgsrc_programtv)
                 "iptvx" -> stringResource(R.string.epgsrc_iptvx)
                 "edem" -> stringResource(R.string.epgsrc_edem)
@@ -274,8 +417,17 @@ private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest
                 else -> src.name
             }
             SettingCard {
-                ToggleRow(label, src.url, src.enabled) { vm.updateEpgSource(src.copy(enabled = !src.enabled)); bump() }
-                if (src.id !in builtInEpgIds) ActionRow(stringResource(R.string.action_delete), null) { vm.removeEpgSource(src); bump() }
+                ToggleRow(label, src.url, src.enabled, inCard = true) {
+                    vm.updateEpgSource(src.copy(enabled = !src.enabled))
+                    bump()
+                }
+                if (src.id !in builtInEpgIds) {
+                    HorizontalDivider(color = C.Divider)
+                    ActionRow(stringResource(R.string.action_delete), null, icon = Icons.Default.Delete, inCard = true) {
+                        vm.removeEpgSource(src)
+                        bump()
+                    }
+                }
             }
         }
         item {
@@ -286,15 +438,27 @@ private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest
                 if (v[1].trim().length > 8) vm.addEpgSource(v[0], v[1])
                 else vm.show(invalidUrl)
             }
-            ActionRow(stringResource(R.string.action_add_epg), stringResource(R.string.add_epg_desc)) {
+            ActionRow(stringResource(R.string.action_add_epg), stringResource(R.string.add_epg_desc), icon = Icons.Default.Add) {
                 onEdit(request)
             }
         }
-        item { ActionRow(busy ?: stringResource(R.string.action_refresh_epg), status(context, s.lastEpgUpdate, s.epgStatus)) { vm.refreshEpg(force = true) } }
-        item { ActionRow(stringResource(R.string.action_clear_epg), stringResource(R.string.clear_epg_desc)) { vm.clearEpg() } }
         item {
-            CycleRow(stringResource(R.string.auto_update_epg), pluralStringResource(R.plurals.auto_update_epg_desc, s.epgIntervalDays, s.epgIntervalDays)) {
-                s.epgIntervalDays = next(listOf(1, 2, 3, 7), s.epgIntervalDays); bump()
+            ActionRow(busy ?: stringResource(R.string.action_refresh_epg), statusText, icon = Icons.Default.Refresh) {
+                vm.refreshEpg(force = true)
+            }
+        }
+        item {
+            ActionRow(stringResource(R.string.action_clear_epg), stringResource(R.string.clear_epg_desc), icon = Icons.Default.Delete) {
+                vm.clearEpg()
+            }
+        }
+        item {
+            CycleRow(
+                stringResource(R.string.auto_update_epg),
+                pluralStringResource(R.plurals.auto_update_epg_desc, intervalDays, intervalDays),
+            ) {
+                s.epgIntervalDays = next(listOf(1, 2, 3, 7), intervalDays)
+                bump()
             }
         }
     }
@@ -302,36 +466,46 @@ private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest
 
 @Composable
 private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
+    val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val globalUa = remember(revision) { s.globalUserAgent }
+    val epgUa = remember(revision) { s.epgUserAgent }
+    val sources = remember(revision) { s.sources }
+
+    LazyColumn(
+        contentPadding = PaddingValues(AppSpace.xs),
+        verticalArrangement = Arrangement.spacedBy(AppSpace.sm),
+    ) {
         item { Header(stringResource(R.string.ua_header), stringResource(R.string.ua_header_desc)) }
         item {
             val request = EditRequest(
                 stringResource(R.string.dialog_global_ua),
-                listOf(stringResource(R.string.field_ua) to s.globalUserAgent),
+                listOf(stringResource(R.string.field_ua) to globalUa),
                 UserAgents.presets,
                 singleLine = false,
             ) { v ->
                 if (v[0].isNotBlank()) s.globalUserAgent = v[0].trim()
+                bump()
             }
-            ActionRow(stringResource(R.string.ua_global), s.globalUserAgent, mono = true) {
+            ActionRow(stringResource(R.string.ua_global), globalUa, mono = true) {
                 onEdit(request)
             }
         }
         item {
             val request = EditRequest(
                 stringResource(R.string.dialog_epg_ua),
-                listOf(stringResource(R.string.field_ua) to s.epgUserAgent),
+                listOf(stringResource(R.string.field_ua) to epgUa),
                 UserAgents.presets,
                 singleLine = false,
             ) { v ->
                 if (v[0].isNotBlank()) s.epgUserAgent = v[0].trim()
+                bump()
             }
-            ActionRow(stringResource(R.string.ua_epg), s.epgUserAgent, mono = true) {
+            ActionRow(stringResource(R.string.ua_epg), epgUa, mono = true) {
                 onEdit(request)
             }
         }
-        items(s.sources, key = { "ua" + it.id }) { src ->
+        items(sources, key = { "ua" + it.id }) { src ->
             val request = EditRequest(
                 stringResource(R.string.dialog_source_ua, src.name),
                 listOf(stringResource(R.string.field_ua) to (src.streamUserAgent ?: "")),
@@ -339,6 +513,7 @@ private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest)
                 singleLine = false,
             ) { v ->
                 vm.updateSource(src.copy(streamUserAgent = v[0].trim().ifBlank { null }))
+                bump()
             }
             ActionRow(stringResource(R.string.ua_source, src.name), src.streamUserAgent ?: stringResource(R.string.ua_global_value), mono = true) {
                 onEdit(request)
@@ -346,7 +521,13 @@ private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest)
         }
         item {
             SettingCard {
-                Text(stringResource(R.string.ua_found_header), color = C.Accent2, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(12.dp))
+                Text(
+                    stringResource(R.string.ua_found_header),
+                    color = C.Accent2,
+                    fontSize = AppType.body,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(AppSpace.md),
+                )
                 listOf(
                     stringResource(R.string.ua_vlcrc) to UserAgents.VLCRC_GLOBAL,
                     stringResource(R.string.ua_wink) to UserAgents.WINK_TIZEN,
@@ -354,12 +535,12 @@ private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest)
                     stringResource(R.string.ua_tvs) to UserAgents.TVS_DOWNLOAD,
                     stringResource(R.string.ua_check) to UserAgents.DUMP_CHECK,
                 ).forEach { (k, v) ->
-                    Column(Modifier.padding(horizontal = 12.dp, vertical = 6.dp)) {
-                        Text(k, color = C.Text2, fontSize = 14.sp)
-                        Text(v, color = C.Text3, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                    Column(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.xs)) {
+                        Text(k, color = C.Text2, fontSize = AppType.body)
+                        Text(v, color = C.Text3, fontSize = AppType.caption, fontFamily = FontFamily.Monospace)
                     }
                 }
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(AppSpace.sm))
             }
         }
     }
@@ -367,19 +548,28 @@ private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest)
 
 @Composable
 private fun PlaybackSection(vm: MainViewModel, bump: () -> Unit) {
+    val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val bufferMs = remember(revision) { s.bufferMs }
+
+    LazyColumn(
+        contentPadding = PaddingValues(AppSpace.xs),
+        verticalArrangement = Arrangement.spacedBy(AppSpace.sm),
+    ) {
         item { Header(stringResource(R.string.playback_header), stringResource(R.string.playback_header_desc)) }
         item {
-            CycleRow(stringResource(R.string.buffer_title), stringResource(R.string.buffer_value, s.bufferMs)) {
-                s.bufferMs = next(listOf(2000, 4000, 8000, 15000), s.bufferMs); bump()
+            CycleRow(stringResource(R.string.buffer_title), stringResource(R.string.buffer_value, bufferMs)) {
+                s.bufferMs = next(listOf(2000, 4000, 8000, 15000), bufferMs)
+                bump()
             }
         }
         item {
             SettingCard {
                 Text(
                     stringResource(R.string.remote_help),
-                    color = C.Text2, fontSize = 14.sp, modifier = Modifier.padding(14.dp)
+                    color = C.Text2,
+                    fontSize = AppType.body,
+                    modifier = Modifier.padding(AppSpace.lg),
                 )
             }
         }
@@ -387,42 +577,82 @@ private fun PlaybackSection(vm: MainViewModel, bump: () -> Unit) {
 }
 
 @Composable
-private fun AppearanceSection(vm: MainViewModel, bump: () -> Unit) {
-    val current = C.accentId
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        item { Header(stringResource(R.string.appearance_header), stringResource(R.string.appearance_header_desc)) }
+private fun AppearanceSection(vm: MainViewModel, isTv: Boolean, bump: () -> Unit) {
+    val revision by vm.settingsRevision.collectAsState()
+    val uiMode by vm.uiMode.collectAsState()
+    val current = remember(revision) { C.accentId }
+    val showHome = remember(revision) { vm.settings.showHomeAtStartup }
+    val tvPreview = remember(revision) { vm.settings.tvPreviewFirst }
+    val uiModes = listOf("auto", "tv", "phone")
+    val uiModeLabel = when (uiMode) {
+        "tv" -> stringResource(R.string.ui_mode_tv)
+        "phone" -> stringResource(R.string.ui_mode_phone)
+        else -> stringResource(R.string.ui_mode_auto)
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(AppSpace.xs),
+        verticalArrangement = Arrangement.spacedBy(AppSpace.sm),
+    ) {
+        item { Header(stringResource(R.string.appearance_interface_header), stringResource(R.string.appearance_interface_desc)) }
         item {
-            ToggleRow(stringResource(R.string.browse_home_startup), null, vm.settings.showHomeAtStartup) {
-                vm.settings.showHomeAtStartup = !vm.settings.showHomeAtStartup
+            CycleRow(stringResource(R.string.ui_mode_title), uiModeLabel) {
+                val nextMode = uiModes[(uiModes.indexOf(uiMode).coerceAtLeast(0) + 1) % uiModes.size]
+                vm.setUiMode(nextMode)
                 bump()
             }
         }
         item {
-            ToggleRow(stringResource(R.string.browse_preview_first), stringResource(R.string.browse_preview_hint), vm.settings.tvPreviewFirst) {
-                vm.settings.tvPreviewFirst = !vm.settings.tvPreviewFirst
+            ToggleRow(stringResource(R.string.browse_home_startup), null, showHome) {
+                vm.settings.showHomeAtStartup = !showHome
                 bump()
             }
         }
-        items(AccentPalette.entries) { palette ->
+        if (isTv) {
+            item {
+                ToggleRow(stringResource(R.string.browse_preview_first), stringResource(R.string.browse_preview_hint), tvPreview) {
+                    vm.settings.tvPreviewFirst = !tvPreview
+                    bump()
+                }
+            }
+        }
+        item {
+            Spacer(Modifier.height(AppSpace.md))
+            Header(stringResource(R.string.appearance_header), stringResource(R.string.appearance_header_desc))
+        }
+        items(AccentPalette.entries, key = { it.id }) { palette ->
+            val selected = palette.id == current
             FocusItem(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Card),
-                selected = palette.id == current,
-                onClick = { vm.setAccent(palette.id); bump() },
+                Modifier.fillMaxWidth(),
+                selected = selected,
+                containerColor = C.Card,
+                borderColor = C.Border,
+                shape = RoundedCornerShape(AppRadius.panel),
+                onClick = {
+                    vm.setAccent(palette.id)
+                    bump()
+                },
             ) { _ ->
                 Row(
-                    Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Box(
-                        Modifier.size(30.dp).clip(CircleShape)
-                            .background(Brush.linearGradient(listOf(palette.accent, palette.gradientEnd)))
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Brush.linearGradient(listOf(palette.accent, palette.gradientEnd))),
                     )
                     Text(
                         accentLabel(palette),
-                        color = C.Text, fontSize = 16.sp,
-                        modifier = Modifier.padding(start = 14.dp).weight(1f),
+                        color = C.Text,
+                        fontSize = AppType.subtitle,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        modifier = Modifier.padding(start = AppSpace.md).weight(1f),
                     )
-                    if (palette.id == current) Text("✓", color = C.Accent2, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    if (selected) {
+                        Icon(Icons.Default.Check, null, tint = C.Accent2, modifier = Modifier.size(20.dp))
+                    }
                 }
             }
         }
@@ -438,18 +668,20 @@ private fun accentLabel(palette: AccentPalette): String = stringResource(
         AccentPalette.TEAL -> R.string.accent_teal
         AccentPalette.PINK -> R.string.accent_pink
         AccentPalette.RED -> R.string.accent_red
-    }
+    },
 )
 
 @Composable
 private fun AboutSection() {
-    LazyColumn {
+    LazyColumn(contentPadding = PaddingValues(AppSpace.xs)) {
         item {
-            Header(stringResource(R.string.app_name) + " ${io.mediacast.simpletv.BuildConfig.VERSION_NAME}", stringResource(R.string.about_header))
+            Header(stringResource(R.string.app_name) + " ${BuildConfig.VERSION_NAME}", stringResource(R.string.about_header))
             SettingCard {
                 Text(
                     stringResource(R.string.about_body),
-                    color = C.Text2, fontSize = 14.sp, modifier = Modifier.padding(14.dp)
+                    color = C.Text2,
+                    fontSize = AppType.body,
+                    modifier = Modifier.padding(AppSpace.lg),
                 )
             }
         }
@@ -459,81 +691,169 @@ private fun AboutSection() {
 // ---------------------------------------------------------------- элементы
 
 /** Id встроенных EPG-источников из core Defaults: их нельзя удалить, подписи переводятся. */
-private val builtInEpgIds = setOf("iptvx_lite", "epgpw", "programtv", "iptvx", "edem", "gabba", "glanz")
+private val builtInEpgIds = setOf("iptvx_lite", "epgpw", "teleguide", "programtv", "iptvx", "edem", "gabba", "glanz")
 
 @Composable
 private fun Header(title: String, subtitle: String) {
-    Column(Modifier.padding(bottom = 8.dp)) {
-        Text(title, color = C.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text(subtitle, color = C.Text3, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
+    Column(Modifier.padding(bottom = AppSpace.sm)) {
+        Text(title, color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold)
+        Text(subtitle, color = C.Text3, fontSize = AppType.body, modifier = Modifier.padding(top = AppSpace.xs))
     }
 }
 
 @Composable
 private fun SettingCard(content: @Composable () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Card)) { content() }
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppRadius.panel))
+            .background(C.Card)
+            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.panel)),
+    ) { content() }
 }
 
 @Composable
-private fun ToggleRow(title: String, subtitle: String?, checked: Boolean, onToggle: () -> Unit) {
-    FocusItem(Modifier.fillMaxWidth(), onClick = onToggle) { _ ->
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, color = C.Text, fontSize = 16.sp)
-                if (!subtitle.isNullOrBlank()) Text(subtitle, color = C.Text3, fontSize = 12.sp, maxLines = 4, overflow = TextOverflow.Ellipsis)
+private fun ToggleRow(
+    title: String,
+    subtitle: String?,
+    checked: Boolean,
+    inCard: Boolean = false,
+    onToggle: () -> Unit,
+) {
+    FocusItem(
+        Modifier.fillMaxWidth(),
+        containerColor = if (inCard) Color.Transparent else C.Card,
+        borderColor = if (inCard) Color.Transparent else C.Border,
+        shape = RoundedCornerShape(AppRadius.panel),
+        onClick = onToggle,
+    ) { _ ->
+        Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).padding(end = AppSpace.md)) {
+                Text(title, color = C.Text, fontSize = AppType.subtitle)
+                if (!subtitle.isNullOrBlank()) {
+                    Text(subtitle, color = C.Text3, fontSize = AppType.caption, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                }
             }
             Switch(
-                checked = checked, onCheckedChange = null,
-                colors = SwitchDefaults.colors(checkedTrackColor = C.Accent, checkedThumbColor = C.Text)
+                checked = checked,
+                onCheckedChange = null,
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = C.Accent,
+                    checkedThumbColor = C.OnAccent,
+                    uncheckedTrackColor = C.PanelSolid,
+                    uncheckedThumbColor = C.Text3,
+                    uncheckedBorderColor = C.Border,
+                ),
             )
         }
     }
 }
 
 @Composable
-private fun ActionRow(title: String, subtitle: String?, mono: Boolean = false, onClick: () -> Unit) {
-    FocusItem(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Card), onClick = onClick) { _ ->
-        Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text(title, color = C.Text, fontSize = 16.sp)
-            if (!subtitle.isNullOrBlank()) Text(
-                subtitle, color = C.Text3, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
-                fontFamily = if (mono) FontFamily.Monospace else FontFamily.Default
-            )
+private fun ActionRow(
+    title: String,
+    subtitle: String?,
+    icon: ImageVector? = null,
+    mono: Boolean = false,
+    inCard: Boolean = false,
+    onClick: () -> Unit,
+) {
+    FocusItem(
+        Modifier.fillMaxWidth(),
+        containerColor = if (inCard) Color.Transparent else C.Card,
+        borderColor = if (inCard) Color.Transparent else C.Border,
+        shape = RoundedCornerShape(AppRadius.panel),
+        onClick = onClick,
+    ) { _ ->
+        Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                Icon(icon, null, tint = C.Accent2, modifier = Modifier.padding(end = AppSpace.md).size(20.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(title, color = C.Text, fontSize = AppType.subtitle)
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        subtitle,
+                        color = C.Text3,
+                        fontSize = AppType.caption,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        fontFamily = if (mono) FontFamily.Monospace else FontFamily.Default,
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun CycleRow(title: String, value: String, onClick: () -> Unit) {
-    FocusItem(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Card), onClick = onClick) { _ ->
-        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, color = C.Text, fontSize = 16.sp, modifier = Modifier.weight(1f))
-            Text("‹ $value ›", color = C.Accent2, fontSize = 15.sp)
+    FocusItem(
+        Modifier.fillMaxWidth(),
+        containerColor = C.Card,
+        borderColor = C.Border,
+        shape = RoundedCornerShape(AppRadius.panel),
+        onClick = onClick,
+    ) { _ ->
+        Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = C.Text, fontSize = AppType.subtitle, modifier = Modifier.weight(1f))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpace.xs)) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
+                Text(value, color = C.Accent2, fontSize = AppType.body, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun EditDialog(req: EditRequest, onCancel: () -> Unit, onDone: (List<String>) -> Unit) {
+private fun EditDialog(req: EditRequest, isTv: Boolean, onCancel: () -> Unit, onDone: (List<String>) -> Unit) {
     val values = remember(req) { req.fields.map { mutableStateOf(it.second) } }
     val fr = remember { FocusRequester() }
-    LaunchedEffect(req) { delay(80); runCatching { fr.requestFocus() } }
-    Box(Modifier.fillMaxSize().background(C.Bg.copy(alpha = 0.85f)), contentAlignment = Alignment.Center) {
+    LaunchedEffect(req) {
+        delay(80)
+        runCatching { fr.requestFocus() }
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(C.Bg.copy(alpha = 0.88f))
+            .imePadding()
+            .padding(horizontal = if (isTv) TvSafe.horizontal else AppSpace.lg, vertical = AppSpace.lg),
+        contentAlignment = Alignment.Center,
+    ) {
         Column(
-            Modifier.widthIn(max = 720.dp).fillMaxWidth(0.92f).clip(RoundedCornerShape(20.dp)).background(C.PanelSolid).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            Modifier
+                .widthIn(max = 680.dp)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .clip(RoundedCornerShape(AppRadius.card))
+                .background(C.PanelSolid)
+                .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+                .padding(AppSpace.xl),
+            verticalArrangement = Arrangement.spacedBy(AppSpace.md),
         ) {
-            Text(req.title, color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Text(req.title, color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold)
             req.fields.forEachIndexed { i, (label, _) ->
                 OutlinedTextField(
-                    value = values[i].value, onValueChange = { values[i].value = it },
-                    label = { Text(label) }, singleLine = req.singleLine,
-                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = C.Accent, focusedTextColor = C.Text, unfocusedTextColor = C.Text),
-                    modifier = Modifier.fillMaxWidth().then(if (i == 0) Modifier.focusRequester(fr) else Modifier)
+                    value = values[i].value,
+                    onValueChange = { values[i].value = it },
+                    label = { Text(label) },
+                    singleLine = req.singleLine,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = C.Accent2,
+                        unfocusedBorderColor = C.Border,
+                        focusedLabelColor = C.Accent2,
+                        unfocusedLabelColor = C.Text3,
+                        focusedTextColor = C.Text,
+                        unfocusedTextColor = C.Text,
+                        cursorColor = C.Accent2,
+                    ),
+                    modifier = Modifier.fillMaxWidth().then(if (i == 0) Modifier.focusRequester(fr) else Modifier),
                 )
             }
             if (req.presets.isNotEmpty()) {
-                Text(stringResource(R.string.presets), color = C.Text3, fontSize = 13.sp)
+                Text(stringResource(R.string.presets), color = C.Text3, fontSize = AppType.caption)
                 req.presets.forEach { (name, ua) ->
                     // Подписи пресетов переводятся по значению UA, а не по исходной строке core.
                     val label = when (ua) {
@@ -544,17 +864,46 @@ private fun EditDialog(req: EditRequest, onCancel: () -> Unit, onDone: (List<Str
                         "TV+Android/1.1.1.2 (Linux;Android 7.1.2) ExoPlayerLib/2.4.4" -> stringResource(R.string.preset_exoplayer)
                         else -> name
                     }
-                    FocusItem(Modifier.fillMaxWidth(), onClick = { values[0].value = ua }) { _ ->
-                        Text(label, color = C.Text2, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                    FocusItem(
+                        Modifier.fillMaxWidth(),
+                        containerColor = C.Card,
+                        borderColor = C.Border,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        onClick = { values[0].value = ua },
+                    ) { _ ->
+                        Text(label, color = C.Text2, fontSize = AppType.body, modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm))
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.padding(top = 6.dp)) {
-                FocusItem(Modifier.clip(RoundedCornerShape(12.dp)).background(C.Accent), onClick = { onDone(values.map { it.value }) }) { _ ->
-                    Text(stringResource(R.string.action_save), color = C.OnAccent, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(AppSpace.md), modifier = Modifier.padding(top = AppSpace.xs)) {
+                FocusItem(
+                    containerColor = C.Accent,
+                    prominent = true,
+                    liftOnFocus = true,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onClick = { onDone(values.map { it.value }) },
+                ) { _ ->
+                    Text(
+                        stringResource(R.string.action_save),
+                        color = C.OnAccent,
+                        fontSize = AppType.body,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = AppSpace.xl, vertical = AppSpace.sm),
+                    )
                 }
-                FocusItem(Modifier.clip(RoundedCornerShape(12.dp)).background(C.Card), onClick = onCancel) { _ ->
-                    Text(stringResource(R.string.action_cancel), color = C.Text2, modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
+                FocusItem(
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    liftOnFocus = true,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onClick = onCancel,
+                ) { _ ->
+                    Text(
+                        stringResource(R.string.action_cancel),
+                        color = C.Text,
+                        fontSize = AppType.body,
+                        modifier = Modifier.padding(horizontal = AppSpace.xl, vertical = AppSpace.sm),
+                    )
                 }
             }
         }

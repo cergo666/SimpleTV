@@ -128,7 +128,7 @@ fun TvGuide(
         if (!initialFocused && rowLoaded) {
             initialFocused = true
             delay(80)
-            val focused = runCatching { firstFocus.requestFocus() }.isSuccess
+            val focused = channels.isNotEmpty() && runCatching { firstFocus.requestFocus() }.isSuccess
             if (!focused) runCatching { focusNow.requestFocus() }
         }
     }
