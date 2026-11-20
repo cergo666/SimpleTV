@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,13 +12,16 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -34,7 +38,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -47,23 +51,31 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.mediacast.simpletv.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import io.mediacast.simpletv.R
 import kotlin.math.absoluteValue
 
 /**
- * Элемент, удобный и для пульта (D-pad), и для касания: подсветка и рамка при фокусе,
+ * Элемент, удобный и для пульта (D-pad), и для касания: подсветка и контрастная рамка при фокусе,
  * OK — нажатие, долгое OK или кнопка «Меню» — дополнительное действие.
+ *
+ * Фон и скругление применяются после [modifier] и `scale`, чтобы углы подложки не выглядывали
+ * из-под скруглённой рамки фокуса. Для акцентных кнопок ([prominent] = true) рисуется
+ * внешний белый контур с зазором, читаемый при любой цветовой теме.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FocusItem(
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    containerColor: Color = Color.Transparent,
+    borderColor: Color = Color.Transparent,
+    prominent: Boolean = false,
+    liftOnFocus: Boolean = false,
     focusRequester: FocusRequester? = null,
-    shape: RoundedCornerShape = RoundedCornerShape(12.dp),
+    shape: RoundedCornerShape = RoundedCornerShape(AppRadius.panel),
     onFocus: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
@@ -72,33 +84,80 @@ fun FocusItem(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     LaunchedEffect(focused) { if (focused) onFocus?.invoke() }
-    val bg by animateColorAsState(
-        when {
-            focused -> C.CardHover
-            selected -> C.Selected
-            else -> Color.Transparent
-        }, label = "bg"
+
+    val scale by animateFloatAsState(
+        targetValue = if (focused && liftOnFocus) 1.04f else 1f,
+        animationSpec = tween(120),
+        label = "focusScale",
     )
-    val scale by animateFloatAsState(if (focused) 1.02f else 1f, label = "scale")
-    Box(
-        modifier
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .scale(scale)
-            .clip(shape)
-            .background(bg)
-            .border(2.dp, if (focused) C.Accent else Color.Transparent, shape)
-            .onKeyEvent { e ->
-                if (onLongClick != null && e.type == KeyEventType.KeyUp && e.key == Key.Menu) {
-                    onLongClick(); true
-                } else false
-            }
-            .combinedClickable(
-                interactionSource = interaction,
-                indication = null,
-                onLongClick = onLongClick,
-                onClick = onClick,
-            )
-    ) { content(focused) }
+
+    val base = modifier
+        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+        .scale(scale)
+
+    if (prominent) {
+        Box(
+            base
+                .border(2.dp, if (focused) Color.White else Color.Transparent, shape)
+                .padding(3.dp)
+                .clip(shape)
+                .background(containerColor)
+                .onKeyEvent { e ->
+                    if (onLongClick != null && e.type == KeyEventType.KeyUp && e.key == Key.Menu) {
+                        onLongClick()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onLongClick = onLongClick,
+                    onClick = onClick,
+                ),
+        ) { content(focused) }
+    } else {
+        val selectedBg = if (containerColor == Color.Transparent) {
+            C.Selected
+        } else {
+            C.Selected.compositeOver(containerColor)
+        }
+        val bg by animateColorAsState(
+            targetValue = when {
+                focused -> C.CardHover
+                selected -> selectedBg
+                else -> containerColor
+            },
+            animationSpec = tween(120),
+            label = "focusBg",
+        )
+        val strokeModifier = when {
+            focused -> Modifier.border(2.dp, C.Accent2, shape)
+            borderColor != Color.Transparent -> Modifier.border(1.dp, borderColor, shape)
+            else -> Modifier
+        }
+        Box(
+            base
+                .clip(shape)
+                .background(bg)
+                .then(strokeModifier)
+                .onKeyEvent { e ->
+                    if (onLongClick != null && e.type == KeyEventType.KeyUp && e.key == Key.Menu) {
+                        onLongClick()
+                        true
+                    } else {
+                        false
+                    }
+                }
+                .combinedClickable(
+                    interactionSource = interaction,
+                    indication = null,
+                    onLongClick = onLongClick,
+                    onClick = onClick,
+                ),
+        ) { content(focused) }
+    }
 }
 
 private val logoColors = listOf(
@@ -118,21 +177,30 @@ fun LogoImage(url: String?, name: String, size: Dp, modifier: Modifier = Modifie
             }
         }
     }
-    val shape = RoundedCornerShape(size / 5)
+    val shape = RoundedCornerShape(AppRadius.control)
+    val fallbackBg = logoColors[name.hashCode().absoluteValue % logoColors.size].copy(alpha = 0.72f)
     Box(
         modifier
             .size(width = size * 1.5f, height = size)
             .clip(shape)
-            .background(if (bmp != null) Color(0x14FFFFFF) else logoColors[name.hashCode().absoluteValue % logoColors.size].copy(alpha = 0.55f)),
-        contentAlignment = Alignment.Center
+            .background(if (bmp != null) Color(0xFF1F2A44) else fallbackBg),
+        contentAlignment = Alignment.Center,
     ) {
         val b = bmp
         if (b != null) {
-            Image(b, null, Modifier.padding(size / 10).fillMaxWidth().fillMaxHeight(), contentScale = ContentScale.Fit)
+            Image(
+                b,
+                null,
+                Modifier.padding(size / 10).fillMaxWidth().fillMaxHeight(),
+                contentScale = ContentScale.Fit,
+            )
         } else {
             Text(
-                initials(name), color = Color.White, fontWeight = FontWeight.Bold,
-                fontSize = (size.value * 0.36f).sp, maxLines = 1
+                initials(name),
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = (size.value * 0.36f).coerceAtLeast(12f).sp,
+                maxLines = 1,
             )
         }
     }
@@ -149,15 +217,55 @@ private fun initials(name: String): String {
 
 @Composable
 fun ProgressLine(progress: Float, modifier: Modifier = Modifier, height: Dp = 3.dp, brush: Brush = C.accentBrush) {
-    Box(modifier.height(height).clip(RoundedCornerShape(height)).background(Color(0x26FFFFFF))) {
+    Box(modifier.height(height).clip(RoundedCornerShape(AppRadius.chip)).background(C.Border)) {
         Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).fillMaxHeight().background(brush))
     }
 }
 
 @Composable
 fun Pill(text: String, modifier: Modifier = Modifier, color: Color = C.Card, textColor: Color = C.Text2) {
-    Box(modifier.clip(RoundedCornerShape(50)).background(color).padding(horizontal = 8.dp, vertical = 2.dp)) {
-        Text(text, color = textColor, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1)
+    Box(modifier.clip(RoundedCornerShape(50)).background(color).padding(horizontal = AppSpace.sm, vertical = 2.dp)) {
+        Text(text, color = textColor, fontSize = AppType.caption, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    }
+}
+
+/** Тонкая вертикальная метка активного элемента — отделяет выбор (playing/active) от фокуса пульта. */
+@Composable
+fun SelectedBar(visible: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier
+            .width(3.dp)
+            .height(20.dp)
+            .clip(RoundedCornerShape(AppRadius.chip))
+            .background(if (visible) C.Accent2 else Color.Transparent),
+    )
+}
+
+/** Строка подсказок для кнопок пульта в нижней части TV-экранов. */
+@Composable
+fun RemoteHintBar(hints: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(AppSpace.lg),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        hints.forEach { (keyLabel, actionLabel) ->
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(AppRadius.chip))
+                        .background(C.Card)
+                        .border(1.dp, C.Border, RoundedCornerShape(AppRadius.chip))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                ) {
+                    Text(keyLabel, color = C.Text, fontSize = AppType.caption, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                }
+                Text(actionLabel, color = C.Text3, fontSize = AppType.caption, maxLines = 1)
+            }
+        }
     }
 }
 
