@@ -51,9 +51,11 @@ class BrowseHome extends StatelessWidget {
               ),
             ],
           ),
-          if (recent.isNotEmpty) _section(L10n.t.browseContinue, recent),
-          if (favourites.isNotEmpty) _section(L10n.t.favourites, favourites),
-          if (live.isNotEmpty) _section(L10n.t.onAirNow, live),
+          if (recent.isNotEmpty)
+            _section(context, L10n.t.browseContinue, recent),
+          if (favourites.isNotEmpty)
+            _section(context, L10n.t.favourites, favourites),
+          if (live.isNotEmpty) _section(context, L10n.t.onAirNow, live),
           if (vm.channels.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: AppSpace.lg),
@@ -67,7 +69,10 @@ class BrowseHome extends StatelessWidget {
     );
   }
 
-  Widget _section(String title, List<Channel> channels) {
+  Widget _section(BuildContext context, String title, List<Channel> channels) {
+    final textScale = MediaQuery.textScalerOf(context)
+        .scale(1.0)
+        .clamp(1.0, 1.4);
     return Padding(
       padding: const EdgeInsets.only(top: AppSpace.lg),
       child: Column(
@@ -82,7 +87,7 @@ class BrowseHome extends StatelessWidget {
           ),
           const SizedBox(height: AppSpace.sm),
           SizedBox(
-            height: 128,
+            height: 136 * textScale,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: channels.length,

@@ -177,8 +177,8 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(14),
-          topRight: Radius.circular(14),
+          topLeft: Radius.circular(AppRadius.panel),
+          topRight: Radius.circular(AppRadius.panel),
         ),
       ),
       child: Row(
@@ -548,7 +548,9 @@ class _PlaylistOverlayState extends State<PlaylistOverlay> {
                       padding: const EdgeInsets.all(AppSpace.xs),
                       child: Icon(
                         isFav ? Icons.star : Icons.star_border,
-                        color: isFav ? Colors.amber : AppColors.textMuted,
+                        color: isFav
+                            ? AppColors.accentLight
+                            : AppColors.textMuted,
                         size: 18,
                       ),
                     ),

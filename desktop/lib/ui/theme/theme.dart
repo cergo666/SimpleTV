@@ -22,7 +22,7 @@ const accentOptions = <AccentOption>[
   AccentOption(
     id: 'violet',
     accent: Color(0xFF5B4FE8),
-    accentSoft: Color(0xFF8B7CFF),
+    accentSoft: Color(0xFF9D91FF),
     gradientEnd: Color(0xFF6D5DF6),
     onAccent: Colors.white,
   ),

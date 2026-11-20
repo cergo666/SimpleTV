@@ -218,7 +218,7 @@ class _GuideTimelineState extends State<GuideTimeline> {
                           return Stack(
                             fit: StackFit.expand,
                             children: [
-                              for (final p in programmes)
+                              for (final p in programmes) ...[
                                 Positioned(
                                   left: width * fraction(p.start),
                                   width:
@@ -226,51 +226,68 @@ class _GuideTimelineState extends State<GuideTimeline> {
                                       (fraction(p.stop) - fraction(p.start)),
                                   top: 4,
                                   bottom: 4,
-                                  child: Tooltip(
-                                    message:
-                                        '${timeLabel(p.start)}–${timeLabel(p.stop)} · ${p.title}',
-                                    child: Material(
-                                      color:
+                                  child: Builder(
+                                    builder: (context) {
+                                      final isNow =
                                           !now.isBefore(p.start) &&
-                                              now.isBefore(p.stop)
-                                          ? AppColors.accent.withValues(
-                                              alpha: 0.7,
-                                            )
-                                          : AppColors.surfaceLight,
-                                      borderRadius: BorderRadius.circular(
-                                        AppRadius.control,
-                                      ),
-                                      clipBehavior: Clip.antiAlias,
-                                      child: InkWell(
-                                        onTap: () => select(channel, p),
-                                        onDoubleTap: () =>
-                                            widget.onProgramme(channel, p),
-                                        onFocusChange: (focused) {
-                                          if (focused) select(channel, p);
-                                        },
-                                        autofocus:
-                                            channel.key == cursor?.$1 &&
-                                            p.start == cursor?.$2,
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: AppSpace.sm,
+                                          now.isBefore(p.stop);
+                                      return Tooltip(
+                                        message:
+                                            '${timeLabel(p.start)}–${timeLabel(p.stop)} · ${p.title}',
+                                        child: Material(
+                                          color: isNow
+                                              ? AppColors.accent.withValues(
+                                                  alpha: 0.28,
+                                                )
+                                              : AppColors.surfaceLight,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              AppRadius.control,
+                                            ),
+                                            side: isNow
+                                                ? BorderSide(
+                                                    color: AppColors.accent,
+                                                    width: 1.5,
+                                                  )
+                                                : BorderSide.none,
                                           ),
-                                          child: Align(
-                                            alignment: Alignment.centerLeft,
-                                            child: Text(
-                                              p.title,
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                fontSize: AppType.caption,
+                                          clipBehavior: Clip.antiAlias,
+                                          child: InkWell(
+                                            onTap: () => select(channel, p),
+                                            onDoubleTap: () =>
+                                                widget.onProgramme(channel, p),
+                                            onFocusChange: (focused) {
+                                              if (focused) select(channel, p);
+                                            },
+                                            autofocus:
+                                                channel.key == cursor?.$1 &&
+                                                p.start == cursor?.$2,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: AppSpace.sm,
+                                                  ),
+                                              child: Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  p.title,
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    fontSize: AppType.caption,
+                                                    color: AppColors.text,
+                                                  ),
+                                                ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                      ),
-                                    ),
+                                      );
+                                    },
                                   ),
                                 ),
+                              ],
                               if (!now.isBefore(start) && now.isBefore(end))
                                 Positioned(
                                   left: width * fraction(now),

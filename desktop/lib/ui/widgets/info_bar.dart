@@ -132,11 +132,11 @@ class InfoBar extends StatelessWidget {
                             ),
                           ),
                           if (vm.favorites.contains(ch.key))
-                            const Padding(
-                              padding: EdgeInsets.only(left: AppSpace.sm),
+                            Padding(
+                              padding: const EdgeInsets.only(left: AppSpace.sm),
                               child: Icon(
                                 Icons.star,
-                                color: Colors.amber,
+                                color: AppColors.accentLight,
                                 size: 18,
                               ),
                             ),
