@@ -54,9 +54,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -176,6 +182,8 @@ fun PlaylistOverlay(
     }
 
     if (wide) {
+        val groupColumnFr = remember { FocusRequester() }
+        val epgFr = remember { FocusRequester() }
         Column(
             Modifier
                 .fillMaxSize()
@@ -189,6 +197,7 @@ fun PlaylistOverlay(
                 GroupsColumn(
                     groups = groups,
                     selected = effectiveGroup,
+                    selectedFocusRequester = groupColumnFr,
                     onGroup = {
                         onGroup(it)
                         query = ""
@@ -198,6 +207,7 @@ fun PlaylistOverlay(
                         query = ""
                         focusChannelsNonce++
                     },
+                    onRightToChannels = { focusChannelsNonce++ },
                     onSettings = onSettings,
                     onHome = onHome,
                     onGuide = onGuide,
@@ -218,6 +228,8 @@ fun PlaylistOverlay(
                     focusChannelsNonce = focusChannelsNonce,
                     onFocus = { focusedKey = it.key },
                     onPlay = play,
+                    onLeftToGroups = { runCatching { groupColumnFr.requestFocus() } },
+                    onRightToEpg = { runCatching { epgFr.requestFocus() } },
                     restoreKey = focused?.key,
                     matches = matches,
                     modifier = Modifier.weight(0.40f).fillMaxHeight(),
@@ -237,6 +249,8 @@ fun PlaylistOverlay(
                             focusCurrent = focusEpg,
                             compact = videoPreview != null,
                             selectedProgramme = matches[epgCh.key]?.takeIf { query.isNotBlank() },
+                            externalFocusRequester = epgFr,
+                            onLeftToChannels = { focusChannelsNonce++ },
                             onPlayLive = { play(epgCh) },
                             onPlayArchive = { p -> vm.playArchive(epgCh, p); onClose() },
                             modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -333,15 +347,29 @@ fun PlaylistOverlay(
 private fun GroupsColumn(
     groups: List<Group>,
     selected: String,
+    selectedFocusRequester: FocusRequester,
     onGroup: (String) -> Unit,
     onConfirmGroup: (String) -> Unit,
+    onRightToChannels: () -> Unit,
     onSettings: () -> Unit,
     onHome: (() -> Unit)?,
     onGuide: (() -> Unit)?,
     now: Long,
     modifier: Modifier,
 ) {
-    Column(modifier) {
+    val homeFr = remember { FocusRequester() }
+    val guideFr = remember { FocusRequester() }
+    val settingsFr = remember { FocusRequester() }
+    Column(
+        modifier.onPreviewKeyEvent { e ->
+            if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) {
+                onRightToChannels()
+                true
+            } else {
+                false
+            }
+        },
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = AppSpace.sm, vertical = AppSpace.xs)) {
             Image(
                 painterResource(R.drawable.ic_launcher_foreground),
@@ -355,7 +383,23 @@ private fun GroupsColumn(
         }
         Spacer(Modifier.height(AppSpace.sm))
         if (onHome != null) {
-            FocusItem(Modifier.fillMaxWidth(), shape = RoundedCornerShape(AppRadius.control), onClick = onHome) { _ ->
+            FocusItem(
+                Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
+                            when {
+                                onGuide != null -> runCatching { guideFr.requestFocus() }.isSuccess
+                                else -> runCatching { selectedFocusRequester.requestFocus() }.isSuccess
+                            }
+                        } else {
+                            false
+                        }
+                    },
+                shape = RoundedCornerShape(AppRadius.control),
+                focusRequester = homeFr,
+                onClick = onHome,
+            ) { _ ->
                 Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Home, null, tint = C.Text2, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(AppSpace.sm))
@@ -364,7 +408,21 @@ private fun GroupsColumn(
             }
         }
         if (onGuide != null) {
-            FocusItem(Modifier.fillMaxWidth(), shape = RoundedCornerShape(AppRadius.control), onClick = onGuide) { _ ->
+            FocusItem(
+                Modifier
+                    .fillMaxWidth()
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (e.key) {
+                            Key.DirectionUp -> if (onHome != null) runCatching { homeFr.requestFocus() }.isSuccess else false
+                            Key.DirectionDown -> runCatching { selectedFocusRequester.requestFocus() }.isSuccess
+                            else -> false
+                        }
+                    },
+                shape = RoundedCornerShape(AppRadius.control),
+                focusRequester = guideFr,
+                onClick = onGuide,
+            ) { _ ->
                 Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.DateRange, null, tint = C.Text2, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(AppSpace.sm))
@@ -373,17 +431,43 @@ private fun GroupsColumn(
             }
         }
         HorizontalDivider(color = C.Divider, modifier = Modifier.padding(vertical = AppSpace.xs))
+        val groupState = rememberLazyListState()
+        val selectedGroupIdx = groups.indexOfFirst { it.name == selected }.coerceAtLeast(0)
+        val firstVisibleGroupIdx = groupState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: selectedGroupIdx
+        val targetGroupName = if (groupState.layoutInfo.visibleItemsInfo.any { it.index == selectedGroupIdx }) {
+            groups.getOrNull(selectedGroupIdx)?.name
+        } else {
+            groups.getOrNull(firstVisibleGroupIdx)?.name
+        }
         LazyColumn(
             Modifier.weight(1f),
+            state = groupState,
             contentPadding = PaddingValues(AppSpace.xs),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            items(groups, key = { it.name }) { g ->
+            itemsIndexed(groups, key = { _, g -> g.name }) { idx, g ->
                 val isSelected = g.name == selected
                 FocusItem(
-                    Modifier.fillMaxWidth(),
+                    Modifier
+                        .fillMaxWidth()
+                        .onPreviewKeyEvent { e ->
+                            if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when {
+                                e.key == Key.DirectionUp && idx == 0 -> {
+                                    when {
+                                        onGuide != null -> runCatching { guideFr.requestFocus() }.isSuccess
+                                        onHome != null -> runCatching { homeFr.requestFocus() }.isSuccess
+                                        else -> false
+                                    }
+                                }
+                                e.key == Key.DirectionDown && idx == groups.lastIndex ->
+                                    runCatching { settingsFr.requestFocus() }.isSuccess
+                                else -> false
+                            }
+                        },
                     selected = isSelected,
                     shape = RoundedCornerShape(AppRadius.control),
+                    focusRequester = if (g.name == targetGroupName) selectedFocusRequester else null,
                     onFocus = { if (!isSelected) onGroup(g.name) },
                     onClick = { onConfirmGroup(g.name) },
                 ) { _ ->
@@ -410,7 +494,20 @@ private fun GroupsColumn(
             }
         }
         HorizontalDivider(color = C.Divider, modifier = Modifier.padding(vertical = AppSpace.xs))
-        FocusItem(Modifier.fillMaxWidth(), shape = RoundedCornerShape(AppRadius.control), onClick = onSettings) { _ ->
+        FocusItem(
+            Modifier
+                .fillMaxWidth()
+                .onPreviewKeyEvent { e ->
+                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp) {
+                        runCatching { selectedFocusRequester.requestFocus() }.isSuccess
+                    } else {
+                        false
+                    }
+                },
+            shape = RoundedCornerShape(AppRadius.control),
+            focusRequester = settingsFr,
+            onClick = onSettings,
+        ) { _ ->
             Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Settings, null, tint = C.Text2, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(AppSpace.sm))
@@ -421,7 +518,13 @@ private fun GroupsColumn(
 }
 
 @Composable
-private fun SearchField(query: String, onQuery: (String) -> Unit, modifier: Modifier = Modifier) {
+private fun SearchField(
+    query: String,
+    onQuery: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    onDown: (() -> Boolean)? = null,
+) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(AppRadius.control)
     Row(
@@ -429,6 +532,15 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, modifier: Modi
             .clip(shape)
             .background(if (focused) C.CardHover else C.Card)
             .border(if (focused) 2.dp else 1.dp, if (focused) C.Accent2 else C.Border, shape)
+            .then(
+                if (onDown != null) {
+                    Modifier.onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) onDown() else false
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -443,6 +555,7 @@ private fun SearchField(query: String, onQuery: (String) -> Unit, modifier: Modi
                 cursorBrush = SolidColor(C.Accent2),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                     .onFocusChanged { focused = it.isFocused },
             )
         }
@@ -469,6 +582,8 @@ private fun ChannelsColumn(
     onFocus: (Channel) -> Unit,
     onPlay: (Channel) -> Unit,
     modifier: Modifier = Modifier,
+    onLeftToGroups: (() -> Unit)? = null,
+    onRightToEpg: (() -> Unit)? = null,
     showHeader: Boolean = true,
     restoreKey: String? = null,
     matches: Map<String, Programme> = emptyMap(),
@@ -476,6 +591,7 @@ private fun ChannelsColumn(
     val state = rememberLazyListState()
     val target = list.indexOfFirst { it.key == (restoreKey ?: playing?.key) }.let { if (it < 0) 0 else it }
     val fr = remember { FocusRequester() }
+    val searchFr = remember { FocusRequester() }
 
     // Прокручиваем при смене группы или поиска, но не крадём фокус из колонки групп и поля поиска.
     LaunchedEffect(query, group) {
@@ -492,7 +608,28 @@ private fun ChannelsColumn(
         }
     }
 
-    Column(modifier) {
+    Column(
+        modifier.then(
+            if (onLeftToGroups != null || onRightToEpg != null) {
+                Modifier.onPreviewKeyEvent { e ->
+                    if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when {
+                        e.key == Key.DirectionLeft && onLeftToGroups != null -> {
+                            onLeftToGroups()
+                            true
+                        }
+                        e.key == Key.DirectionRight && onRightToEpg != null -> {
+                            onRightToEpg()
+                            true
+                        }
+                        else -> false
+                    }
+                }
+            } else {
+                Modifier
+            },
+        ),
+    ) {
         if (showHeader) {
             Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(start = AppSpace.sm, bottom = AppSpace.sm)) {
                 Text(
@@ -506,7 +643,13 @@ private fun ChannelsColumn(
                 )
                 Text("  ${list.size}", color = C.Text3, fontSize = AppType.body, modifier = Modifier.padding(bottom = 2.dp))
             }
-            SearchField(query, onQuery, Modifier.fillMaxWidth().padding(bottom = AppSpace.sm))
+            SearchField(
+                query,
+                onQuery,
+                Modifier.fillMaxWidth().padding(bottom = AppSpace.sm),
+                focusRequester = searchFr,
+                onDown = { runCatching { fr.requestFocus() }.isSuccess },
+            )
         }
         if (list.isEmpty()) {
             Text(
@@ -515,6 +658,12 @@ private fun ChannelsColumn(
                 fontSize = AppType.body,
                 modifier = Modifier.padding(AppSpace.lg),
             )
+        }
+        val firstVisibleChannelIdx = state.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
+        val effectiveTargetIdx = if (state.layoutInfo.visibleItemsInfo.isEmpty() || state.layoutInfo.visibleItemsInfo.any { it.index == target }) {
+            target
+        } else {
+            firstVisibleChannelIdx
         }
         LazyColumn(
             state = state,
@@ -531,7 +680,8 @@ private fun ChannelsColumn(
                     fav = ch.key in fav,
                     match = matches[ch.key]?.takeIf { query.isNotBlank() },
                     showNext = group == MainViewModel.NOW,
-                    focusRequester = if (i == target) fr else null,
+                    focusRequester = if (i == effectiveTargetIdx) fr else null,
+                    onUpToSearch = if (i == 0 && showHeader) ({ runCatching { searchFr.requestFocus() }.isSuccess }) else null,
                     onFocus = { onFocus(ch) },
                     onClick = { onPlay(ch) },
                     onLong = { vm.toggleFavorite(ch) },
@@ -551,6 +701,7 @@ private fun ChannelRow(
     match: Programme?,
     showNext: Boolean,
     focusRequester: FocusRequester?,
+    onUpToSearch: (() -> Boolean)? = null,
     onFocus: () -> Unit,
     onClick: () -> Unit,
     onLong: () -> Unit,
@@ -568,7 +719,17 @@ private fun ChannelRow(
     }
     val cur = nn.firstOrNull { it.isNow(now) }
     FocusItem(
-        Modifier.fillMaxWidth(),
+        Modifier
+            .fillMaxWidth()
+            .then(
+                if (onUpToSearch != null) {
+                    Modifier.onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp) onUpToSearch() else false
+                    }
+                } else {
+                    Modifier
+                },
+            ),
         selected = playing,
         focusRequester = focusRequester,
         shape = RoundedCornerShape(AppRadius.control),
@@ -656,6 +817,8 @@ fun EpgPanel(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     selectedProgramme: Programme? = null,
+    externalFocusRequester: FocusRequester? = null,
+    onLeftToChannels: (() -> Unit)? = null,
 ) {
     val epgVersion by vm.epgVersion.collectAsState()
     val archiveDays = ch.variants.maxOfOrNull { it.catchup?.days ?: 0.0 } ?: 0.0
@@ -672,7 +835,8 @@ fun EpgPanel(
         }
     }
     val state = rememberLazyListState()
-    val fr = remember { FocusRequester() }
+    val internalFr = remember { FocusRequester() }
+    val fr = externalFocusRequester ?: internalFr
     val list = items ?: emptyList()
     var focusedStart by rememberSaveable(ch.key) { mutableStateOf<Long?>(null) }
     val curIdx = list.indexOfFirst { it.isNow(now) }.let { if (it < 0) list.indexOfFirst { p -> p.start > now } else it }
@@ -696,6 +860,20 @@ fun EpgPanel(
             .clip(RoundedCornerShape(AppRadius.card))
             .background(C.PanelSolid)
             .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+            .then(
+                if (onLeftToChannels != null) {
+                    Modifier.onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                            onLeftToChannels()
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                } else {
+                    Modifier
+                },
+            )
             .padding(AppSpace.lg),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -773,7 +951,21 @@ fun EpgPanel(
             ch.variants.any { StreamResolver.catchupUrl(it, s.start, s.stop, now) != null }
         }
         val showBackToLive = !playingThis || playback.archive != null
+        val firstActionFr = remember { FocusRequester() }
+        val firstActionKey = when {
+            curIdx >= 0 -> "now"
+            playableSelected != null -> "from_start"
+            showBackToLive -> "live"
+            else -> null
+        }
         LazyRow(
+            Modifier.onPreviewKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
+                    runCatching { fr.requestFocus() }.isSuccess
+                } else {
+                    false
+                }
+            },
             horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
             contentPadding = PaddingValues(vertical = AppSpace.xs),
         ) {
@@ -783,6 +975,7 @@ fun EpgPanel(
                         containerColor = C.Card,
                         borderColor = C.Border,
                         shape = RoundedCornerShape(AppRadius.control),
+                        focusRequester = if (firstActionKey == "now") firstActionFr else null,
                         onClick = {
                             focusedStart = list[curIdx].start
                             scope.launch { state.scrollToItem(curIdx) }
@@ -798,6 +991,7 @@ fun EpgPanel(
                         containerColor = C.Accent,
                         prominent = true,
                         shape = RoundedCornerShape(AppRadius.control),
+                        focusRequester = if (firstActionKey == "from_start") firstActionFr else null,
                         onClick = { onPlayArchive(playableSelected) },
                     ) { _ ->
                         Text(
@@ -816,6 +1010,7 @@ fun EpgPanel(
                         containerColor = C.Card,
                         borderColor = C.Border,
                         shape = RoundedCornerShape(AppRadius.control),
+                        focusRequester = if (firstActionKey == "live") firstActionFr else null,
                         onClick = onPlayLive,
                     ) { _ ->
                         Text(stringResource(R.string.action_back_to_live), color = C.Accent2, fontSize = AppType.caption, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm))
@@ -832,6 +1027,12 @@ fun EpgPanel(
                 fontSize = AppType.body,
                 modifier = Modifier.padding(vertical = AppSpace.sm),
             )
+        }
+        val firstVisibleEpgIdx = state.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
+        val effectiveEpgTargetIdx = if (state.layoutInfo.visibleItemsInfo.isEmpty() || state.layoutInfo.visibleItemsInfo.any { it.index == target }) {
+            target
+        } else {
+            firstVisibleEpgIdx
         }
         LazyColumn(
             state = state,
@@ -858,10 +1059,24 @@ fun EpgPanel(
                         StreamResolver.catchupUrl(it, p.start, p.stop, now) != null
                     }
                     FocusItem(
-                        Modifier.fillMaxWidth(),
+                        Modifier
+                            .fillMaxWidth()
+                            .then(
+                                if (i == 0 && firstActionKey != null) {
+                                    Modifier.onPreviewKeyEvent { e ->
+                                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp) {
+                                            runCatching { firstActionFr.requestFocus() }.isSuccess
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                } else {
+                                    Modifier
+                                },
+                            ),
                         selected = isNow,
                         shape = RoundedCornerShape(AppRadius.control),
-                        focusRequester = if (i == target) fr else null,
+                        focusRequester = if (i == effectiveEpgTargetIdx) fr else null,
                         onFocus = { focusedStart = p.start },
                         onClick = {
                             when {

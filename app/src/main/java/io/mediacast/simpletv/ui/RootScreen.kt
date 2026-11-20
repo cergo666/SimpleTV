@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -209,7 +210,7 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
         number = ""
     }
 
-    BackHandler {
+    fun onBack() {
         when {
             overlay != Overlay.NONE -> vm.closeOverlay()
             number.isNotEmpty() -> number = ""
@@ -225,6 +226,8 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
             }
         }
     }
+
+    BackHandler { onBack() }
 
     fun onKey(e: KeyEvent): Boolean {
         if (overlay != Overlay.NONE || e.type != KeyEventType.KeyDown) return false
@@ -299,7 +302,11 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
     ) {
         val portrait = !inPip && !isTv && maxHeight > maxWidth
         val wide = !portrait && maxWidth >= 600.dp && (isTv || maxWidth >= 840.dp)
-        val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
+        val topInset = maxOf(
+            WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding(),
+            WindowInsets.displayCutout.asPaddingValues().calculateTopPadding(),
+            if (portrait) AppSpace.md else 0.dp,
+        )
         val portraitBar = 56.dp + topInset
         val videoArea = if (portrait) {
             Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight(0.37f).padding(top = portraitBar)
@@ -396,12 +403,17 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
             Row(
                 Modifier
                     .then(
-                        if (isTv) Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
-                        else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                        if (isTv) {
+                            Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
+                        } else {
+                            Modifier
+                                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal))
+                                .padding(top = topInset)
+                        },
                     )
                     .then(if (portrait) Modifier.fillMaxWidth().heightIn(min = 56.dp) else if (!isTv) Modifier.padding(AppSpace.lg) else Modifier)
                     .padding(horizontal = if (portrait) AppSpace.lg else 0.dp),
-                horizontalArrangement = if (portrait) Arrangement.Center else Arrangement.spacedBy(AppSpace.sm),
+                horizontalArrangement = Arrangement.spacedBy(if (portrait) AppSpace.md else AppSpace.sm, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RoundButton(Icons.Default.Home, stringResource(R.string.browse_home)) { vm.setOverlay(Overlay.HOME) }
@@ -562,10 +574,13 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
         if (busy != null && overlay == Overlay.NONE) {
             Row(
                 Modifier
-                    .align(Alignment.TopStart)
+                    .align(if (portrait) Alignment.TopCenter else Alignment.TopStart)
                     .then(
-                        if (isTv) Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
-                        else Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(AppSpace.lg),
+                        when {
+                            portrait -> Modifier.padding(top = portraitBar + AppSpace.sm, start = AppSpace.lg, end = AppSpace.lg)
+                            isTv -> Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
+                            else -> Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(AppSpace.lg)
+                        },
                     )
                     .clip(RoundedCornerShape(50))
                     .background(C.PanelSolid)
@@ -581,17 +596,14 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
 
         val statsShown by vm.showStats.collectAsState()
         if (statsShown && playback.channel != null && overlay == Overlay.NONE) {
-            val statsTop = if (busy != null) {
-                if (isTv) TvSafe.vertical + 44.dp else AppSpace.lg + 44.dp
-            } else {
-                if (isTv) TvSafe.vertical else AppSpace.lg
-            }
+            val baseTop = if (portrait) portraitBar + AppSpace.sm else if (isTv) TvSafe.vertical else AppSpace.lg
+            val statsTop = if (busy != null) baseTop + 44.dp else baseTop
             StatsOverlay(
                 vm,
                 playback,
                 Modifier
                     .align(Alignment.TopStart)
-                    .then(if (isTv) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))
+                    .then(if (isTv || portrait) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))
                     .padding(
                         start = if (isTv) TvSafe.horizontal else AppSpace.lg,
                         top = statsTop,
@@ -605,7 +617,7 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
                 .align(Alignment.TopCenter)
                 .then(
                     when {
-                        portrait -> Modifier.padding(top = portraitBar + AppSpace.xs)
+                        portrait -> Modifier.padding(top = portraitBar + (if (busy != null) 48.dp else AppSpace.xs))
                         isTv -> Modifier.padding(top = TvSafe.vertical)
                         else -> Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
                     },

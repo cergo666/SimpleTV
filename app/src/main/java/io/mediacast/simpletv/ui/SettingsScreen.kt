@@ -61,6 +61,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -96,23 +101,36 @@ fun SettingsScreen(vm: MainViewModel, isTv: Boolean, wide: Boolean, onClose: () 
     var section by rememberSaveable { mutableIntStateOf(0) }
     var edit by remember { mutableStateOf<EditRequest?>(null) }
     val bump: () -> Unit = { vm.notifySettingsChanged() }
-    BackHandler { if (edit != null) edit = null else onClose() }
+    val handleBack = { if (edit != null) edit = null else onClose() }
+    BackHandler(onBack = handleBack)
     val firstFr = remember { FocusRequester() }
+    val sectionFrs = remember(sections.size) { List(sections.size) { FocusRequester() } }
+    val contentFr = remember { FocusRequester() }
+    var focusContentNonce by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         delay(80)
-        runCatching { firstFr.requestFocus() }
+        runCatching { (sectionFrs.getOrNull(section) ?: firstFr).requestFocus() }
+    }
+    LaunchedEffect(focusContentNonce) {
+        if (focusContentNonce == 0) return@LaunchedEffect
+        delay(40)
+        runCatching { contentFr.requestFocus() }
     }
 
-    Box(Modifier.fillMaxSize().background(C.Bg.copy(alpha = 0.97f))) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(C.Bg.copy(alpha = 0.97f)),
+    ) {
         val content: @Composable (Modifier) -> Unit = { m ->
             Column(m) {
                 when (section) {
-                    0 -> PlaylistsSection(vm, bump) { edit = it }
-                    1 -> ChannelsSection(vm, bump)
-                    2 -> EpgSection(vm, bump) { edit = it }
-                    3 -> UaSection(vm, bump) { edit = it }
-                    4 -> PlaybackSection(vm, bump)
-                    5 -> AppearanceSection(vm, isTv, bump)
+                    0 -> PlaylistsSection(vm, contentFr, bump) { edit = it }
+                    1 -> ChannelsSection(vm, contentFr, bump)
+                    2 -> EpgSection(vm, contentFr, bump) { edit = it }
+                    3 -> UaSection(vm, contentFr, bump) { edit = it }
+                    4 -> PlaybackSection(vm, contentFr, bump)
+                    5 -> AppearanceSection(vm, isTv, contentFr, bump)
                     else -> AboutSection()
                 }
             }
@@ -137,12 +155,26 @@ fun SettingsScreen(vm: MainViewModel, isTv: Boolean, wide: Boolean, onClose: () 
                     sections.forEachIndexed { i, s ->
                         val isSelected = i == section
                         FocusItem(
-                            Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                                .onPreviewKeyEvent { e ->
+                                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionRight) {
+                                        section = i
+                                        focusContentNonce++
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                },
                             selected = isSelected,
                             shape = RoundedCornerShape(AppRadius.control),
-                            focusRequester = if (i == 0) firstFr else null,
+                            focusRequester = sectionFrs[i],
                             onFocus = { section = i },
-                            onClick = { section = i },
+                            onClick = {
+                                section = i
+                                focusContentNonce++
+                            },
                         ) { _ ->
                             Row(
                                 Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md),
@@ -178,7 +210,19 @@ fun SettingsScreen(vm: MainViewModel, isTv: Boolean, wide: Boolean, onClose: () 
                     }
                 }
                 Spacer(Modifier.width(AppSpace.xl))
-                content(Modifier.weight(1f).fillMaxHeight())
+                content(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .onPreviewKeyEvent { e ->
+                            if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionLeft) {
+                                runCatching { sectionFrs[section].requestFocus() }
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                )
             }
         } else {
             Column(
@@ -238,7 +282,7 @@ fun SettingsScreen(vm: MainViewModel, isTv: Boolean, wide: Boolean, onClose: () 
 // ---------------------------------------------------------------- секции
 
 @Composable
-private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
+private fun PlaylistsSection(vm: MainViewModel, firstFr: FocusRequester, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
     val busy by vm.playlistBusy.collectAsState()
     val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
@@ -248,6 +292,7 @@ private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditR
     val context = LocalContext.current
     val statusText = status(context, s.lastPlaylistUpdate, s.playlistStatus)
     val invalidUrl = stringResource(R.string.error_invalid_url)
+    val firstSourceId = sources.firstOrNull()?.id
 
     LazyColumn(
         contentPadding = PaddingValues(AppSpace.xs),
@@ -261,6 +306,7 @@ private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditR
                     src.urls.joinToString("\n") + (src.streamUserAgent?.let { "\nUA: $it" } ?: ""),
                     src.enabled,
                     inCard = true,
+                    focusRequester = if (src.id == firstSourceId) firstFr else null,
                 ) {
                     vm.updateSource(src.copy(enabled = !src.enabled))
                     bump()
@@ -293,7 +339,12 @@ private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditR
                 if (v[1].trim().length > 8) vm.addSource(v[0], v[1], v[2])
                 else vm.show(invalidUrl)
             }
-            ActionRow(stringResource(R.string.action_add_playlist), stringResource(R.string.add_playlist_desc), icon = Icons.Default.Add) {
+            ActionRow(
+                stringResource(R.string.action_add_playlist),
+                stringResource(R.string.add_playlist_desc),
+                icon = Icons.Default.Add,
+                focusRequester = if (firstSourceId == null) firstFr else null,
+            ) {
                 onEdit(request)
             }
         }
@@ -321,7 +372,7 @@ private fun PlaylistsSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditR
 }
 
 @Composable
-private fun ChannelsSection(vm: MainViewModel, bump: () -> Unit) {
+private fun ChannelsSection(vm: MainViewModel, firstFr: FocusRequester, bump: () -> Unit) {
     val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
     val hideSd = remember(revision) { s.hideSdDuplicates }
@@ -345,7 +396,7 @@ private fun ChannelsSection(vm: MainViewModel, bump: () -> Unit) {
     ) {
         item { Header(stringResource(R.string.channels_header), stringResource(R.string.channels_header_desc)) }
         item {
-            ToggleRow(stringResource(R.string.hide_sd_title), stringResource(R.string.hide_sd_desc), hideSd) {
+            ToggleRow(stringResource(R.string.hide_sd_title), stringResource(R.string.hide_sd_desc), hideSd, focusRequester = firstFr) {
                 toggle { s.hideSdDuplicates = !hideSd }
             }
         }
@@ -389,7 +440,7 @@ private fun ChannelsSection(vm: MainViewModel, bump: () -> Unit) {
 }
 
 @Composable
-private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
+private fun EpgSection(vm: MainViewModel, firstFr: FocusRequester, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
     val busy by vm.epgBusy.collectAsState()
     val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
@@ -398,6 +449,7 @@ private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest
     val context = LocalContext.current
     val statusText = status(context, s.lastEpgUpdate, s.epgStatus)
     val invalidUrl = stringResource(R.string.error_invalid_url)
+    val firstEpgId = epgSources.firstOrNull()?.id
 
     LazyColumn(
         contentPadding = PaddingValues(AppSpace.xs),
@@ -417,7 +469,13 @@ private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest
                 else -> src.name
             }
             SettingCard {
-                ToggleRow(label, src.url, src.enabled, inCard = true) {
+                ToggleRow(
+                    label,
+                    src.url,
+                    src.enabled,
+                    inCard = true,
+                    focusRequester = if (src.id == firstEpgId) firstFr else null,
+                ) {
                     vm.updateEpgSource(src.copy(enabled = !src.enabled))
                     bump()
                 }
@@ -438,7 +496,12 @@ private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest
                 if (v[1].trim().length > 8) vm.addEpgSource(v[0], v[1])
                 else vm.show(invalidUrl)
             }
-            ActionRow(stringResource(R.string.action_add_epg), stringResource(R.string.add_epg_desc), icon = Icons.Default.Add) {
+            ActionRow(
+                stringResource(R.string.action_add_epg),
+                stringResource(R.string.add_epg_desc),
+                icon = Icons.Default.Add,
+                focusRequester = if (firstEpgId == null) firstFr else null,
+            ) {
                 onEdit(request)
             }
         }
@@ -465,7 +528,7 @@ private fun EpgSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest
 }
 
 @Composable
-private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
+private fun UaSection(vm: MainViewModel, firstFr: FocusRequester, bump: () -> Unit, onEdit: (EditRequest) -> Unit) {
     val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
     val globalUa = remember(revision) { s.globalUserAgent }
@@ -487,7 +550,7 @@ private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest)
                 if (v[0].isNotBlank()) s.globalUserAgent = v[0].trim()
                 bump()
             }
-            ActionRow(stringResource(R.string.ua_global), globalUa, mono = true) {
+            ActionRow(stringResource(R.string.ua_global), globalUa, mono = true, focusRequester = firstFr) {
                 onEdit(request)
             }
         }
@@ -547,7 +610,7 @@ private fun UaSection(vm: MainViewModel, bump: () -> Unit, onEdit: (EditRequest)
 }
 
 @Composable
-private fun PlaybackSection(vm: MainViewModel, bump: () -> Unit) {
+private fun PlaybackSection(vm: MainViewModel, firstFr: FocusRequester, bump: () -> Unit) {
     val revision by vm.settingsRevision.collectAsState()
     val s = vm.settings
     val bufferMs = remember(revision) { s.bufferMs }
@@ -558,7 +621,7 @@ private fun PlaybackSection(vm: MainViewModel, bump: () -> Unit) {
     ) {
         item { Header(stringResource(R.string.playback_header), stringResource(R.string.playback_header_desc)) }
         item {
-            CycleRow(stringResource(R.string.buffer_title), stringResource(R.string.buffer_value, bufferMs)) {
+            CycleRow(stringResource(R.string.buffer_title), stringResource(R.string.buffer_value, bufferMs), focusRequester = firstFr) {
                 s.bufferMs = next(listOf(2000, 4000, 8000, 15000), bufferMs)
                 bump()
             }
@@ -577,7 +640,7 @@ private fun PlaybackSection(vm: MainViewModel, bump: () -> Unit) {
 }
 
 @Composable
-private fun AppearanceSection(vm: MainViewModel, isTv: Boolean, bump: () -> Unit) {
+private fun AppearanceSection(vm: MainViewModel, isTv: Boolean, firstFr: FocusRequester, bump: () -> Unit) {
     val revision by vm.settingsRevision.collectAsState()
     val uiMode by vm.uiMode.collectAsState()
     val current = remember(revision) { C.accentId }
@@ -596,7 +659,7 @@ private fun AppearanceSection(vm: MainViewModel, isTv: Boolean, bump: () -> Unit
     ) {
         item { Header(stringResource(R.string.appearance_interface_header), stringResource(R.string.appearance_interface_desc)) }
         item {
-            CycleRow(stringResource(R.string.ui_mode_title), uiModeLabel) {
+            CycleRow(stringResource(R.string.ui_mode_title), uiModeLabel, focusRequester = firstFr) {
                 val nextMode = uiModes[(uiModes.indexOf(uiMode).coerceAtLeast(0) + 1) % uiModes.size]
                 vm.setUiMode(nextMode)
                 bump()
@@ -718,6 +781,7 @@ private fun ToggleRow(
     subtitle: String?,
     checked: Boolean,
     inCard: Boolean = false,
+    focusRequester: FocusRequester? = null,
     onToggle: () -> Unit,
 ) {
     FocusItem(
@@ -725,6 +789,7 @@ private fun ToggleRow(
         containerColor = if (inCard) Color.Transparent else C.Card,
         borderColor = if (inCard) Color.Transparent else C.Border,
         shape = RoundedCornerShape(AppRadius.panel),
+        focusRequester = focusRequester,
         onClick = onToggle,
     ) { _ ->
         Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
@@ -756,6 +821,7 @@ private fun ActionRow(
     icon: ImageVector? = null,
     mono: Boolean = false,
     inCard: Boolean = false,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
     FocusItem(
@@ -763,6 +829,7 @@ private fun ActionRow(
         containerColor = if (inCard) Color.Transparent else C.Card,
         borderColor = if (inCard) Color.Transparent else C.Border,
         shape = RoundedCornerShape(AppRadius.panel),
+        focusRequester = focusRequester,
         onClick = onClick,
     ) { _ ->
         Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
@@ -787,12 +854,18 @@ private fun ActionRow(
 }
 
 @Composable
-private fun CycleRow(title: String, value: String, onClick: () -> Unit) {
+private fun CycleRow(
+    title: String,
+    value: String,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit,
+) {
     FocusItem(
         Modifier.fillMaxWidth(),
         containerColor = C.Card,
         borderColor = C.Border,
         shape = RoundedCornerShape(AppRadius.panel),
+        focusRequester = focusRequester,
         onClick = onClick,
     ) { _ ->
         Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {

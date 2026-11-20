@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -115,7 +116,7 @@ fun TvGuide(
     val focusNow = remember { FocusRequester() }
     val state = rememberLazyListState(channels.indexOfFirst { it.key == selectedChannel?.key }.coerceAtLeast(0))
 
-    val rowLoaded by produceState(false, selectedChannel?.key, start, epgVersion) {
+    val rowLoaded by produceState(cachedSelectedSchedule != null, selectedChannel?.key, start, epgVersion) {
         value = if (selectedChannel == null) {
             true
         } else {
@@ -124,12 +125,12 @@ fun TvGuide(
         }
     }
 
-    LaunchedEffect(rowLoaded, channels.isEmpty()) {
+    LaunchedEffect(rowLoaded, programmes.size, channels.isEmpty()) {
         if (!initialFocused && rowLoaded) {
-            initialFocused = true
             delay(80)
             val focused = channels.isNotEmpty() && runCatching { firstFocus.requestFocus() }.isSuccess
             if (!focused) runCatching { focusNow.requestFocus() }
+            initialFocused = true
         }
     }
 
@@ -264,6 +265,13 @@ fun TvGuide(
         }
 
         LazyRow(
+            Modifier.onKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
+                    runCatching { firstFocus.requestFocus() }.isSuccess
+                } else {
+                    false
+                }
+            },
             horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
             contentPadding = PaddingValues(vertical = AppSpace.xs),
         ) {
@@ -392,23 +400,33 @@ fun TvGuide(
         }
         HorizontalDivider(color = C.Divider)
 
+        val selectedChannelIdx = channels.indexOfFirst { it.key == selectedChannel?.key }.coerceAtLeast(0)
+        val firstVisibleGuideIdx = state.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: selectedChannelIdx
+        val targetRowIdx = if (state.layoutInfo.visibleItemsInfo.isEmpty() || state.layoutInfo.visibleItemsInfo.any { it.index == selectedChannelIdx }) {
+            selectedChannelIdx
+        } else {
+            firstVisibleGuideIdx
+        }
         LazyColumn(
             state = state,
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(vertical = AppSpace.xs),
             verticalArrangement = Arrangement.spacedBy(AppSpace.xs),
         ) {
-            items(channels, key = Channel::key) { channel ->
+            itemsIndexed(channels, key = { _, ch -> ch.key }) { rowIdx, channel ->
+                val isPlayingChannel = channel.key == active?.key
+                val isSelectedRow = channel.key == selectedChannel?.key
+                val isTargetFocusRow = rowIdx == targetRowIdx
+                val isFirstChannel = rowIdx == 0
                 val cached = remember(channel.key, start, end, epgVersion) { vm.peekSchedule(channel, start, end) }
-                val entries by produceState(cached.orEmpty(), channel.key, start, epgVersion) {
+                val rowEntries by produceState(cached.orEmpty(), channel.key, start, epgVersion) {
                     if (cached == null) {
                         value = vm.scheduleCached(channel, start, end)
                     } else {
                         value = cached
                     }
                 }
-                val isPlayingChannel = channel.key == active?.key
-                val isSelectedRow = channel.key == selectedChannel?.key
+                val entries = if (isSelectedRow && programmes.isNotEmpty()) programmes else rowEntries
 
                 Row(Modifier.fillMaxWidth().height(58.dp), verticalAlignment = Alignment.CenterVertically) {
                     Row(
@@ -450,12 +468,21 @@ fun TvGuide(
 
                         if (entries.isEmpty()) {
                             FocusItem(
-                                Modifier.fillMaxSize().padding(vertical = 2.dp),
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(vertical = 2.dp)
+                                    .onKeyEvent { e ->
+                                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp && isFirstChannel) {
+                                            runCatching { focusNow.requestFocus() }.isSuccess
+                                        } else {
+                                            false
+                                        }
+                                    },
                                 selected = isPlayingChannel,
                                 containerColor = C.Card,
                                 borderColor = C.Border,
                                 shape = RoundedCornerShape(AppRadius.control),
-                                focusRequester = if (isSelectedRow) firstFocus else null,
+                                focusRequester = if (isTargetFocusRow) firstFocus else null,
                                 onFocus = {
                                     channelKey = channel.key
                                     programmeStart = null
@@ -473,7 +500,7 @@ fun TvGuide(
                                 )
                             }
                         } else {
-                            val targetIdx = if (isSelectedRow) {
+                            val targetIdx = if (isTargetFocusRow) {
                                 when (pendingEdgeFocus) {
                                     1 -> entries.lastIndex
                                     -1 -> 0
@@ -496,7 +523,7 @@ fun TvGuide(
                                 val canArchive = past && channel.variants.any {
                                     StreamResolver.catchupUrl(it, programme.start, programme.stop, now) != null
                                 }
-                                val slotFocusRequester = if (isSelectedRow && i == targetIdx) firstFocus else null
+                                val slotFocusRequester = if (isTargetFocusRow && i == targetIdx) firstFocus else null
                                 FocusItem(
                                     Modifier
                                         .offset(x = trackWidth * left)
@@ -506,6 +533,8 @@ fun TvGuide(
                                         .onKeyEvent { e ->
                                             if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
                                             when {
+                                                e.key == Key.DirectionUp && isFirstChannel ->
+                                                    runCatching { focusNow.requestFocus() }.isSuccess
                                                 e.key == Key.DirectionRight && i == entries.lastIndex -> {
                                                     channelKey = channel.key
                                                     pendingEdgeFocus = 1

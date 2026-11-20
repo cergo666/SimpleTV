@@ -41,6 +41,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -122,9 +127,10 @@ fun BrowseHome(
                 )
                 if (wide) {
                     Spacer(Modifier.width(AppSpace.md))
-                    HomeNavPill(Icons.AutoMirrored.Filled.List, stringResource(R.string.nav_channels), channelsBtnFocus, onChannels)
-                    HomeNavPill(Icons.Default.DateRange, stringResource(R.string.nav_programme), null, onGuide)
-                    HomeNavPill(Icons.Default.Settings, stringResource(R.string.nav_settings), null, onSettings)
+                    val downToCards = { runCatching { firstCardFocus.requestFocus() }.isSuccess }
+                    HomeNavPill(Icons.AutoMirrored.Filled.List, stringResource(R.string.nav_channels), channelsBtnFocus, downToCards, onChannels)
+                    HomeNavPill(Icons.Default.DateRange, stringResource(R.string.nav_programme), null, downToCards, onGuide)
+                    HomeNavPill(Icons.Default.Settings, stringResource(R.string.nav_settings), null, downToCards, onSettings)
                 }
                 Spacer(Modifier.weight(1f))
                 if (wide) {
@@ -138,14 +144,15 @@ fun BrowseHome(
             }
 
             if (!wide) {
+                val downToCards = { runCatching { firstCardFocus.requestFocus() }.isSuccess }
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
                     contentPadding = PaddingValues(vertical = AppSpace.xs),
                     modifier = Modifier.padding(bottom = AppSpace.sm),
                 ) {
-                    item { HomeNavPill(Icons.AutoMirrored.Filled.List, stringResource(R.string.nav_channels), channelsBtnFocus, onChannels) }
-                    item { HomeNavPill(Icons.Default.DateRange, stringResource(R.string.nav_programme), null, onGuide) }
-                    item { HomeNavPill(Icons.Default.Settings, stringResource(R.string.nav_settings), null, onSettings) }
+                    item { HomeNavPill(Icons.AutoMirrored.Filled.List, stringResource(R.string.nav_channels), channelsBtnFocus, downToCards, onChannels) }
+                    item { HomeNavPill(Icons.Default.DateRange, stringResource(R.string.nav_programme), null, downToCards, onGuide) }
+                    item { HomeNavPill(Icons.Default.Settings, stringResource(R.string.nav_settings), null, downToCards, onSettings) }
                 }
             }
 
@@ -164,6 +171,7 @@ fun BrowseHome(
                         now = now,
                         vm = vm,
                         firstFocus = if (rowIdx == 0) firstCardFocus else null,
+                        onUpToNav = if (rowIdx == 0) ({ runCatching { channelsBtnFocus.requestFocus() }.isSuccess }) else null,
                     )
                 }
             }
@@ -187,9 +195,13 @@ private fun HomeNavPill(
     icon: ImageVector,
     label: String,
     focusRequester: FocusRequester?,
+    onDown: () -> Boolean,
     onClick: () -> Unit,
 ) {
     FocusItem(
+        Modifier.onPreviewKeyEvent { e ->
+            if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) onDown() else false
+        },
         containerColor = C.Card,
         borderColor = C.Border,
         liftOnFocus = true,
@@ -218,6 +230,7 @@ private fun BrowseRow(
     now: Long,
     vm: MainViewModel,
     firstFocus: FocusRequester?,
+    onUpToNav: (() -> Boolean)? = null,
 ) {
     Column {
         Text(
@@ -235,7 +248,18 @@ private fun BrowseRow(
                 val isPlaying = channel.key == playingKey
                 val prog = guide[channel.key]
                 FocusItem(
-                    Modifier.width(224.dp).height(140.dp),
+                    Modifier
+                        .width(224.dp)
+                        .height(140.dp)
+                        .then(
+                            if (onUpToNav != null) {
+                                Modifier.onPreviewKeyEvent { e ->
+                                    if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp) onUpToNav() else false
+                                }
+                            } else {
+                                Modifier
+                            },
+                        ),
                     selected = isPlaying,
                     containerColor = C.Card,
                     borderColor = C.Border,
