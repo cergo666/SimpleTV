@@ -75,6 +75,7 @@ data class PlaybackState(
     val archive: Programme? = null,
     val buffering: Boolean = false,
     val isPlaying: Boolean = true,
+    val paused: Boolean = false,
     val error: String? = null,
     val videoInfo: String? = null,
     val userAgent: String? = null,

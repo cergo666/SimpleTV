@@ -21,6 +21,23 @@
     <string name="hint_tv_keys">▲▼ — другой канал, OK — список</string>
     <string name="hint_touch">Коснитесь экрана, чтобы открыть управление</string>
     <string name="connecting">Подключение · %1$s %2$d/%3$d</string>
+    <string name="paused_label">Пауза</string>
+    <string name="pause_hint_tv">Play / Pause — продолжить</string>
+    <string name="seek_backward_fmt">−%1$d с</string>
+    <string name="seek_forward_fmt">+%1$d с</string>
+
+    <!-- Remote hint bar -->
+    <string name="hint_key_ok">OK</string>
+    <string name="hint_key_back">Back</string>
+    <string name="hint_key_menu">Меню</string>
+    <string name="hint_key_ud">▲▼</string>
+    <string name="hint_key_lr">◀▶</string>
+    <string name="hint_switch_channel">Переключить</string>
+    <string name="hint_channels">Каналы</string>
+    <string name="hint_guide">Телегид</string>
+    <string name="hint_stream">Поток</string>
+    <string name="hint_seek_30s">±30 с</string>
+    <string name="hint_back_live">В эфир</string>
 
     <!-- Info bar -->
     <string name="pill_archive">АРХИВ</string>
@@ -46,7 +63,8 @@
     <string name="image_zoom">Заполнить (обрезка)</string>
     <string name="image_fill">Растянуть</string>
     <string name="section_other">Прочее</string>
-    <string name="action_favorite_toggle">★ Избранное: вкл/выкл</string>
+    <string name="action_favorite_add">Добавить в избранное</string>
+    <string name="action_favorite_remove">Убрать из избранного</string>
 
     <!-- Welcome -->
     <string name="welcome_subtitle">Beeline • Wink TV • телепрограмма XMLTV</string>

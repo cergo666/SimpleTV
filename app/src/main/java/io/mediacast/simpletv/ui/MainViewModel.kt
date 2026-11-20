@@ -22,6 +22,7 @@ import io.mediacast.simpletv.data.EpgRepository
 import io.mediacast.simpletv.data.EpgSource
 import io.mediacast.simpletv.data.PlaylistRepository
 import io.mediacast.simpletv.data.Programme
+import io.mediacast.simpletv.data.Quality
 import io.mediacast.simpletv.data.Settings
 import io.mediacast.simpletv.data.SourceConfig
 import io.mediacast.simpletv.data.AndroidSettings
@@ -29,6 +30,7 @@ import io.mediacast.simpletv.data.AndroidPlaylistRepository
 import io.mediacast.simpletv.player.PlayerController
 import io.mediacast.simpletv.R
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 enum class Overlay { NONE, HOME, PLAYLIST, EPG, SETTINGS, STREAM, GUIDE }
 
@@ -52,6 +54,39 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun setAccent(id: String) {
         settings.accent = id
         C.apply(id)
+    }
+
+    private val _uiMode = MutableStateFlow(settings.uiMode)
+    val uiMode: StateFlow<String> = _uiMode.asStateFlow()
+
+    fun setUiMode(mode: String) {
+        settings.uiMode = mode
+        _uiMode.value = mode
+    }
+
+    private val _settingsRevision = MutableStateFlow(0)
+    val settingsRevision: StateFlow<Int> = _settingsRevision.asStateFlow()
+
+    fun notifySettingsChanged() {
+        _settingsRevision.value++
+    }
+
+    private val _qualityRevision = MutableStateFlow(0)
+    val qualityRevision: StateFlow<Int> = _qualityRevision.asStateFlow()
+
+    fun selectQuality(q: Quality?) {
+        controller.setQuality(q)
+        _qualityRevision.value++
+    }
+
+    fun togglePlayPause() {
+        val p = controller.player
+        if (p.playWhenReady) p.pause() else p.play()
+    }
+
+    fun seekArchive(deltaMs: Long): Long? {
+        if (controller.state.value.archive == null) return null
+        return controller.seekBy(deltaMs)
     }
 
     private val _overlay = MutableStateFlow(Overlay.NONE)
@@ -229,7 +264,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val changed = runCatching { epg.update(force, _channels.value) { msg -> _epgBusy.value = msg } }
             .getOrElse { e -> show(text(R.string.error_epg, e.message ?: "")); false }
         if (changed) {
-            _epgVersion.value++
+            bumpEpgVersion()
             show(settings.epgStatus)
         } else if (force) show(settings.epgStatus)
         _epgBusy.value = null
@@ -243,7 +278,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun relinkEpgLocked() {
         _epgBusy.value = text(R.string.epg_relink)
-        if (runCatching { epg.relink(_channels.value) { _epgBusy.value = it } }.getOrDefault(false)) _epgVersion.value++
+        if (runCatching { epg.relink(_channels.value) { _epgBusy.value = it } }.getOrDefault(false)) bumpEpgVersion()
         _epgBusy.value = null
     }
 
@@ -253,12 +288,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             epgMutex.withLock {
                 withContext(Dispatchers.IO) { epg.clear() }
-                _epgVersion.value++
+                bumpEpgVersion()
                 _epgBusy.value = text(R.string.epg_checking)
                 val changed = runCatching { epg.update(force = true, _channels.value) { msg -> _epgBusy.value = msg } }
                     .getOrElse { e -> show(text(R.string.error_epg, e.message ?: "")); false }
                 if (changed) {
-                    _epgVersion.value++
+                    bumpEpgVersion()
                     show(text(R.string.epg_updated))
                 } else {
                     show(settings.epgStatus)
@@ -402,6 +437,40 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ------------------------------------------------------------ EPG (вызывается из UI в IO)
+
+    private val nowNextCache = ConcurrentHashMap<String, List<Programme>>()
+    private val scheduleCache = object : LinkedHashMap<String, List<Programme>>(128, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Programme>>?): Boolean = size > 256
+    }
+
+    private fun bumpEpgVersion() {
+        nowNextCache.clear()
+        synchronized(scheduleCache) { scheduleCache.clear() }
+        _epgVersion.value++
+    }
+
+    fun peekNowNext(ch: Channel, now: Long): List<Programme>? =
+        nowNextCache["${ch.key}|${now / 60_000}"]
+
+    suspend fun nowNextCached(ch: Channel, now: Long): List<Programme> {
+        val key = "${ch.key}|${now / 60_000}"
+        nowNextCache[key]?.let { return it }
+        val list = withContext(Dispatchers.IO) { epg.nowNext(ch, now) }
+        if (nowNextCache.size > 600) nowNextCache.clear()
+        nowNextCache[key] = list
+        return list
+    }
+
+    fun peekSchedule(ch: Channel, from: Long, to: Long): List<Programme>? =
+        synchronized(scheduleCache) { scheduleCache["${ch.key}|$from|$to"] }
+
+    suspend fun scheduleCached(ch: Channel, from: Long, to: Long): List<Programme> {
+        val key = "${ch.key}|$from|$to"
+        synchronized(scheduleCache) { scheduleCache[key] }?.let { return it }
+        val list = withContext(Dispatchers.IO) { epg.schedule(ch, from, to) }
+        synchronized(scheduleCache) { scheduleCache[key] = list }
+        return list
+    }
 
     suspend fun nowNext(ch: Channel): List<Programme> = withContext(Dispatchers.IO) { epg.nowNext(ch) }
     suspend fun schedule(ch: Channel, from: Long, to: Long): List<Programme> = withContext(Dispatchers.IO) { epg.schedule(ch, from, to) }

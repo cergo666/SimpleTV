@@ -21,4 +21,9 @@ class SharedPreferencesStore(private val p: SharedPreferences) : SettingsStore {
     override fun allKeys(): Set<String> = p.all.keys
 }
 
-class AndroidSettings(context: Context) : Settings(SharedPreferencesStore(context.getSharedPreferences("stv", Context.MODE_PRIVATE)))
+class AndroidSettings(context: Context) : Settings(SharedPreferencesStore(context.getSharedPreferences("stv", Context.MODE_PRIVATE))) {
+    /** Режим интерфейса: auto, tv, phone. */
+    var uiMode: String
+        get() = store.getString("uiMode", "auto") ?: "auto"
+        set(v) = store.putString("uiMode", v)
+}

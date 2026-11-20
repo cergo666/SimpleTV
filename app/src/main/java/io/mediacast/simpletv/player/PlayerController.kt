@@ -101,6 +101,10 @@ class PlayerController(
                 }
             }
 
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                _state.update { it.copy(paused = !playWhenReady) }
+            }
+
             override fun onVideoSizeChanged(videoSize: VideoSize) {
                 if (videoSize.width > 0) {
                     _state.update { it.copy(videoInfo = "${videoSize.width}×${videoSize.height}") }
@@ -222,7 +226,7 @@ class PlayerController(
         val needsResolution = PublicTv.needsResolution(url)
         if (needsResolution) player.stop()
         val ua = v.userAgent ?: settings.globalUserAgent
-        _state.value = PlaybackState(channel, index, archive, buffering = true, userAgent = ua)
+        _state.value = PlaybackState(channel, index, archive, buffering = true, paused = false, userAgent = ua)
         stats.reset()
         confirmedPlayback = false
         renderedFrame = false
@@ -348,6 +352,25 @@ class PlayerController(
             params.setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, q.trackIndex))
         }
         player.trackSelectionParameters = params.build()
+    }
+
+    fun isQualitySelected(q: Quality?): Boolean {
+        val videoOverride = player.trackSelectionParameters.overrides.values
+            .firstOrNull { it.type == C.TRACK_TYPE_VIDEO }
+        if (q == null) return videoOverride == null
+        val group = player.currentTracks.groups.getOrNull(q.groupIndex) ?: return false
+        return videoOverride != null &&
+            videoOverride.mediaTrackGroup == group.mediaTrackGroup &&
+            q.trackIndex in videoOverride.trackIndices
+    }
+
+    fun seekBy(deltaMs: Long): Long? {
+        val s = _state.value
+        val archiveDur = s.archive?.let { (it.stop - it.start).takeIf { d -> d > 0 } }
+        val duration = player.duration.takeIf { it > 0 && it != C.TIME_UNSET } ?: archiveDur ?: return null
+        val target = (player.currentPosition + deltaMs).coerceIn(0L, duration)
+        player.seekTo(target)
+        return target
     }
 
     fun release() {

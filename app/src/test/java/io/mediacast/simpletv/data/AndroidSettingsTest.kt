@@ -37,6 +37,14 @@ class AndroidSettingsTest {
     }
 
     @Test
+    fun uiModeSurvivesANewSettingsInstance() {
+        val settings = AndroidSettings(context)
+        assertEquals("auto", settings.uiMode)
+        settings.uiMode = "tv"
+        assertEquals("tv", AndroidSettings(context).uiMode)
+    }
+
+    @Test
     fun sourceListRoundTripsThroughJson() {
         val settings = AndroidSettings(context)
         settings.sources = listOf(

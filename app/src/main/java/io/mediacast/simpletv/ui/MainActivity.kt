@@ -48,7 +48,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (isTelevision(this)) requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        if (effectiveIsTv(this, vm.settings.uiMode)) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).apply {
             hide(WindowInsetsCompat.Type.systemBars())
@@ -116,7 +118,7 @@ class MainActivity : ComponentActivity() {
         if (event.action == android.view.KeyEvent.ACTION_DOWN) {
             val isOverlayOpen = vm.overlay.value != Overlay.NONE
             when (event.keyCode) {
-                android.view.KeyEvent.KEYCODE_GUIDE -> if (isTelevision(this)) {
+                android.view.KeyEvent.KEYCODE_GUIDE -> if (effectiveIsTv(this, vm.uiMode.value)) {
                     vm.setOverlay(Overlay.EPG)
                     return true
                 }
@@ -148,6 +150,16 @@ class MainActivity : ComponentActivity() {
 
 internal fun isTelevision(context: Context): Boolean {
     val ui = context.getSystemService(UiModeManager::class.java)
+    val pm = context.packageManager
+    @Suppress("DEPRECATION")
+    val hasLeanback = pm.hasSystemFeature(PackageManager.FEATURE_LEANBACK)
     return ui?.currentModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-        !context.packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+        hasLeanback ||
+        !pm.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+}
+
+internal fun effectiveIsTv(context: Context, uiMode: String): Boolean = when (uiMode) {
+    "tv" -> true
+    "phone" -> false
+    else -> isTelevision(context)
 }

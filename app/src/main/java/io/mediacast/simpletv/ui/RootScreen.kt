@@ -1,30 +1,17 @@
 package io.mediacast.simpletv.ui
 
-import android.annotation.SuppressLint
-import android.app.UiModeManager
-import android.app.PictureInPictureParams
-import android.content.Context
-import android.content.Intent
-import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
-import android.content.res.Configuration
-import android.os.Build
-import android.os.Bundle
-import android.util.Rational
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -32,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -56,8 +44,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -83,10 +73,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -96,39 +85,38 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import kotlinx.coroutines.delay
-import io.mediacast.simpletv.data.StreamChecker
 import io.mediacast.simpletv.R
 import io.mediacast.simpletv.data.Channel
-import io.mediacast.simpletv.data.Programme
 import io.mediacast.simpletv.data.PlaybackState
+import io.mediacast.simpletv.data.Programme
+import io.mediacast.simpletv.data.StreamChecker
+import io.mediacast.simpletv.data.StreamKind
 import io.mediacast.simpletv.data.StreamStats
+import io.mediacast.simpletv.data.StreamVariant
 import io.mediacast.simpletv.data.channelsLabel
 import io.mediacast.simpletv.data.fmtFps
 import io.mediacast.simpletv.data.fmtRate
-import io.mediacast.simpletv.data.StreamKind
-import io.mediacast.simpletv.data.StreamVariant
-import io.mediacast.simpletv.StvApp.enforceReleaseDebuggerPolicy
-import androidx.compose.ui.text.font.FontFamily
+import kotlinx.coroutines.delay
+import kotlin.math.abs
 
 @OptIn(UnstableApi::class)
 @Composable
 fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip: (() -> Unit)? = null) {
     val context = LocalContext.current
     val resources = LocalResources.current
-    val isTv = remember(context) { isTelevision(context) }
+    val uiMode by vm.uiMode.collectAsState()
+    val isTv = remember(context, uiMode) { effectiveIsTv(context, uiMode) }
     val channels by vm.channels.collectAsState()
     val loaded by vm.loaded.collectAsState()
     val playback by vm.controller.state.collectAsState()
@@ -144,6 +132,11 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
     var number by remember { mutableStateOf("") }
     var lastBack by remember { mutableLongStateOf(0L) }
     var resize by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    var rootFocused by remember { mutableStateOf(false) }
+    var seekHudText by remember { mutableStateOf<String?>(null) }
+    var seekHudForward by remember { mutableStateOf(true) }
+    var seekHudTick by remember { mutableIntStateOf(0) }
+
     val rootFocus = remember { FocusRequester() }
     val browseState = rememberSaveableStateHolder()
     val video = remember(vm) { movableContentOf<Int, Modifier> { mode, modifier -> VideoSurface(vm, mode, modifier) } }
@@ -156,12 +149,29 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
     }
 
     val now by produceState(System.currentTimeMillis()) {
-        while (true) { value = System.currentTimeMillis(); delay(15_000) }
+        while (true) {
+            value = System.currentTimeMillis()
+            delay(15_000)
+        }
     }
 
     fun showInfo() {
         infoVisible = true
         infoTrigger++
+    }
+
+    fun triggerSeek(deltaMs: Long) {
+        if (vm.seekArchive(deltaMs) != null) {
+            val sec = abs(deltaMs / 1000).toInt()
+            seekHudForward = deltaMs >= 0
+            seekHudText = if (deltaMs >= 0) {
+                resources.getString(R.string.seek_forward_fmt, sec)
+            } else {
+                resources.getString(R.string.seek_backward_fmt, sec)
+            }
+            seekHudTick++
+            showInfo()
+        }
     }
 
     LaunchedEffect(playback.channel?.key, playback.archive) {
@@ -180,8 +190,17 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
         delay(5000)
         controlsVisible = false
     }
-    LaunchedEffect(overlay) {
-        if (overlay == Overlay.NONE) { delay(60); runCatching { rootFocus.requestFocus() } }
+    LaunchedEffect(seekHudTick) {
+        if (seekHudTick == 0) return@LaunchedEffect
+        delay(1500)
+        seekHudText = null
+    }
+    val shouldFocusRoot = overlay == Overlay.NONE && playback.error == null && !(loaded && channels.isEmpty())
+    LaunchedEffect(shouldFocusRoot) {
+        if (shouldFocusRoot) {
+            delay(60)
+            runCatching { rootFocus.requestFocus() }
+        }
     }
     LaunchedEffect(number) {
         if (number.isEmpty()) return@LaunchedEffect
@@ -195,36 +214,75 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
             overlay != Overlay.NONE -> vm.closeOverlay()
             number.isNotEmpty() -> number = ""
             playback.archive != null -> vm.backToLive()
-            infoVisible || controlsVisible -> { infoVisible = false; controlsVisible = false }
+            infoVisible || controlsVisible -> {
+                infoVisible = false
+                controlsVisible = false
+            }
             System.currentTimeMillis() - lastBack < 2500 -> onExit()
-            else -> { lastBack = System.currentTimeMillis(); vm.show(resources.getString(R.string.press_back_again)) }
+            else -> {
+                lastBack = System.currentTimeMillis()
+                vm.show(resources.getString(R.string.press_back_again))
+            }
         }
     }
 
     fun onKey(e: KeyEvent): Boolean {
         if (overlay != Overlay.NONE || e.type != KeyEventType.KeyDown) return false
-        val digit = when (e.key) {
-            Key.Zero, Key.NumPad0 -> 0; Key.One, Key.NumPad1 -> 1; Key.Two, Key.NumPad2 -> 2
-            Key.Three, Key.NumPad3 -> 3; Key.Four, Key.NumPad4 -> 4; Key.Five, Key.NumPad5 -> 5
-            Key.Six, Key.NumPad6 -> 6; Key.Seven, Key.NumPad7 -> 7; Key.Eight, Key.NumPad8 -> 8
-            Key.Nine, Key.NumPad9 -> 9; else -> -1
+        val emptyPlaylist = loaded && channels.isEmpty()
+        if (!emptyPlaylist) {
+            val digit = when (e.key) {
+                Key.Zero, Key.NumPad0 -> 0
+                Key.One, Key.NumPad1 -> 1
+                Key.Two, Key.NumPad2 -> 2
+                Key.Three, Key.NumPad3 -> 3
+                Key.Four, Key.NumPad4 -> 4
+                Key.Five, Key.NumPad5 -> 5
+                Key.Six, Key.NumPad6 -> 6
+                Key.Seven, Key.NumPad7 -> 7
+                Key.Eight, Key.NumPad8 -> 8
+                Key.Nine, Key.NumPad9 -> 9
+                else -> -1
+            }
+            if (digit >= 0) {
+                if (number.length < 4) number += digit
+                return true
+            }
         }
-        if (digit >= 0) { if (number.length < 4) number += digit; return true }
         when (e.key) {
-            Key.DirectionUp -> vm.zapForward()
-            Key.DirectionDown -> vm.zapBackward()
             Key.ChannelUp, Key.PageUp -> vm.zapForward()
             Key.ChannelDown, Key.PageDown -> vm.zapBackward()
-            Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.DirectionLeft -> vm.setOverlay(Overlay.PLAYLIST)
-            Key.DirectionRight, Key.Guide, Key.TvDataService -> vm.setOverlay(if (isTv) Overlay.EPG else Overlay.GUIDE)
+            Key.Guide, Key.TvDataService -> vm.setOverlay(if (isTv) Overlay.EPG else Overlay.GUIDE)
             Key.Menu, Key.Settings -> vm.setOverlay(Overlay.STREAM)
             Key.Info -> showInfo()
-            Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause ->
-                with(vm.controller.player) { if (isPlaying) pause() else play() }
+            Key.MediaPlayPause, Key.MediaPlay, Key.MediaPause -> {
+                vm.togglePlayPause()
+                if (playback.channel != null) showInfo()
+            }
+            Key.MediaRewind, Key.MediaSkipBackward ->
+                if (playback.archive != null) triggerSeek(-30_000L) else return false
+            Key.MediaFastForward, Key.MediaSkipForward ->
+                if (playback.archive != null) triggerSeek(30_000L) else return false
             Key.ProgramRed -> playback.channel?.let { vm.toggleFavorite(it) }
             Key.ProgramGreen, Key.MediaNext -> vm.nextVariant()
             Key.ProgramBlue, Key.MediaPrevious -> vm.playPreviousChannel()
             Key.ProgramYellow -> vm.toggleStats()
+            Key.DirectionUp -> if (rootFocused) vm.zapForward() else return false
+            Key.DirectionDown -> if (rootFocused) vm.zapBackward() else return false
+            Key.DirectionLeft -> if (rootFocused) {
+                if (playback.archive != null) triggerSeek(-30_000L) else vm.setOverlay(Overlay.PLAYLIST)
+            } else {
+                return false
+            }
+            Key.DirectionRight -> if (rootFocused) {
+                if (playback.archive != null) triggerSeek(30_000L) else vm.setOverlay(if (isTv) Overlay.EPG else Overlay.GUIDE)
+            } else {
+                return false
+            }
+            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> if (rootFocused) {
+                vm.setOverlay(Overlay.PLAYLIST)
+            } else {
+                return false
+            }
             else -> return false
         }
         return true
@@ -235,57 +293,94 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
             .fillMaxSize()
             .background(Color.Black)
             .focusRequester(rootFocus)
+            .onFocusChanged { rootFocused = it.isFocused }
             .focusable()
-            .onKeyEvent(::onKey)
+            .onKeyEvent(::onKey),
     ) {
         val portrait = !inPip && !isTv && maxHeight > maxWidth
         val wide = !portrait && (isTv || maxWidth >= 840.dp)
         val topInset = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
         val portraitBar = 56.dp + topInset
-        val videoArea = if (portrait) Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight(0.37f).padding(top = portraitBar)
-            else Modifier.fillMaxSize()
+        val videoArea = if (portrait) {
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight(0.37f).padding(top = portraitBar)
+        } else {
+            Modifier.fillMaxSize()
+        }
 
         val usePreview = isTv && wide && !inPip && overlay == Overlay.PLAYLIST && vm.settings.tvPreviewFirst
         if (!usePreview) video(resize, videoArea)
         if (inPip) return@BoxWithConstraints
 
-        // жесты телефона: касание — панель, свайп — переключение каналов
-        Box(
-            videoArea
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = {
-                        controlsVisible = !controlsVisible
-                        if (controlsVisible) showInfo() else infoVisible = false
-                    })
-                }
-                .pointerInput(Unit) {
-                    var acc = 0f
-                    detectVerticalDragGestures(
-                        onDragStart = { acc = 0f },
-                        onDragEnd = { if (acc < -120) vm.zapForward() else if (acc > 120) vm.zapBackward() },
-                        onVerticalDrag = { _, d -> acc += d },
+        Box(videoArea) {
+            // жесты телефона: касание — панель, свайп — переключение каналов
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(Unit) {
+                        detectTapGestures(onTap = {
+                            controlsVisible = !controlsVisible
+                            if (controlsVisible) showInfo() else infoVisible = false
+                        })
+                    }
+                    .pointerInput(Unit) {
+                        var acc = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { acc = 0f },
+                            onDragEnd = { if (acc < -120) vm.zapForward() else if (acc > 120) vm.zapBackward() },
+                            onVerticalDrag = { _, d -> acc += d },
+                        )
+                    },
+            )
+
+            PlaybackStatus(
+                vm = vm,
+                s = playback,
+                isTv = isTv,
+                compact = portrait,
+                onChannels = { vm.setOverlay(Overlay.PLAYLIST) },
+                modifier = Modifier.align(Alignment.Center).padding(horizontal = AppSpace.lg),
+            )
+
+            if (overlay == Overlay.NONE && playback.channel != null && playback.error == null && !playback.buffering) {
+                val hudText = seekHudText
+                when {
+                    hudText != null -> SeekHud(
+                        text = hudText,
+                        forward = seekHudForward,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                    playback.paused -> PauseHud(
+                        isTv = isTv,
+                        modifier = Modifier.align(Alignment.Center),
                     )
                 }
-        )
-
-        PlaybackStatus(vm, playback, isTv, if (portrait) {
-            Modifier.align(Alignment.TopCenter).padding(top = maxHeight * 0.13f)
-        } else Modifier.align(Alignment.Center))
+            }
+        }
 
         if (loaded && channels.isEmpty()) {
-            Welcome(plsBusy, onRefresh = { vm.refreshPlaylists() }, onSettings = { vm.setOverlay(Overlay.SETTINGS) }, modifier = Modifier.align(Alignment.Center))
+            Welcome(
+                busy = plsBusy,
+                onRefresh = { vm.refreshPlaylists() },
+                onSettings = { vm.setOverlay(Overlay.SETTINGS) },
+                modifier = Modifier.align(Alignment.Center),
+            )
         }
 
         val showChannelButtons = !isTv && !portrait && controlsVisible && channels.size > 1
+        val showInfoBar = !portrait && overlay == Overlay.NONE && playback.channel != null &&
+            (infoVisible || showChannelButtons || (playback.archive != null && controlsVisible) || playback.paused)
         AnimatedVisibility(
-            visible = !portrait && (infoVisible || showChannelButtons || playback.archive != null && controlsVisible) &&
-                overlay == Overlay.NONE && playback.channel != null,
+            visible = showInfoBar,
             enter = fadeIn() + slideInVertically { it / 2 },
             exit = fadeOut() + slideOutVertically { it / 2 },
-            modifier = Modifier.align(Alignment.BottomCenter)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .then(
+                    if (isTv) Modifier
+                    else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)),
+                ),
         ) {
-            playback.channel?.let { InfoBar(vm, it, playback, now, wide, showChannelButtons) }
+            playback.channel?.let { InfoBar(vm, it, playback, now, isTv, wide, showChannelButtons, seekHudTick) }
         }
 
         AnimatedVisibility(
@@ -300,10 +395,13 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
         ) {
             Row(
                 Modifier
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-                    .then(if (portrait) Modifier.fillMaxWidth().heightIn(min = 56.dp) else Modifier.padding(16.dp))
-                    .padding(horizontal = if (portrait) 16.dp else 0.dp),
-                horizontalArrangement = if (portrait) Arrangement.Center else Arrangement.spacedBy(10.dp),
+                    .then(
+                        if (isTv) Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
+                        else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    )
+                    .then(if (portrait) Modifier.fillMaxWidth().heightIn(min = 56.dp) else if (!isTv) Modifier.padding(AppSpace.lg) else Modifier)
+                    .padding(horizontal = if (portrait) AppSpace.lg else 0.dp),
+                horizontalArrangement = if (portrait) Arrangement.Center else Arrangement.spacedBy(AppSpace.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 RoundButton(Icons.Default.Home, stringResource(R.string.browse_home)) { vm.setOverlay(Overlay.HOME) }
@@ -334,7 +432,7 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
                 videoPreview = if (usePreview) ({
                     Box(Modifier.fillMaxWidth().height(minOf(maxHeight * 0.28f, 180.dp)).background(Color.Black)) {
                         video(resize, Modifier.fillMaxSize())
-                        PlaybackStatus(vm, playback, true, Modifier.align(Alignment.Center))
+                        PlaybackStatus(vm, playback, true, compact = true, onChannels = {}, modifier = Modifier.align(Alignment.Center))
                     }
                 }) else null,
             )
@@ -346,26 +444,53 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
 
         if (overlay == Overlay.GUIDE) {
             playback.channel?.let { ch ->
-                Box(Modifier.fillMaxSize().background(C.Panel).padding(12.dp)) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(C.Panel)
+                        .windowInsetsPadding(WindowInsets.safeDrawing)
+                        .padding(AppSpace.md),
+                ) {
                     EpgPanel(
                         vm, ch, now, focusCurrent = true,
                         onPlayLive = { vm.backToLive(); vm.closeOverlay() },
                         onPlayArchive = { p -> vm.playArchive(ch, p); vm.closeOverlay() },
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
                     )
                 }
             }
         }
 
         if (overlay == Overlay.STREAM) {
-            StreamPanel(vm, playback, resize, { resize = it }, onSettings = { vm.setOverlay(Overlay.SETTINGS) }, onClose = { vm.closeOverlay() }, modifier = Modifier.align(Alignment.CenterEnd))
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(if (wide) Color.Black.copy(alpha = 0.4f) else Color.Transparent)
+                    .pointerInput(Unit) { detectTapGestures { vm.closeOverlay() } },
+            ) {
+                StreamPanel(
+                    vm = vm,
+                    s = playback,
+                    isTv = isTv,
+                    wide = wide,
+                    resize = resize,
+                    onResize = { resize = it },
+                    onSettings = { vm.setOverlay(Overlay.SETTINGS) },
+                    onClose = { vm.closeOverlay() },
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .pointerInput(Unit) { detectTapGestures { /* absorb */ } },
+                )
+            }
         }
 
         if (overlay == Overlay.SETTINGS) SettingsScreen(vm, wide, onClose = { vm.closeOverlay() })
 
         if (portrait && overlay == Overlay.NONE && channels.isNotEmpty()) {
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.63f)
-                .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).fillMaxWidth().fillMaxHeight(0.63f)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal)),
+            ) {
                 PlaylistOverlay(
                     vm, false, now, group, { group = it },
                     focusEpg = false,
@@ -378,30 +503,72 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
 
         if (number.isNotEmpty()) {
             Box(
-                Modifier.align(Alignment.TopEnd).padding(32.dp).clip(RoundedCornerShape(16.dp)).background(C.Panel)
-                    .padding(horizontal = 26.dp, vertical = 12.dp)
-            ) { Text(number, color = C.Text, fontSize = 44.sp, fontWeight = FontWeight.Bold) }
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .then(
+                        if (isTv) Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
+                        else Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(AppSpace.xl),
+                    )
+                    .clip(RoundedCornerShape(AppRadius.card))
+                    .background(C.PanelSolid)
+                    .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+                    .padding(horizontal = AppSpace.xl, vertical = AppSpace.md),
+            ) { Text(number, color = C.Text, fontSize = AppType.hero, fontWeight = FontWeight.Bold) }
         }
 
-        // статус фонового обновления (как OSD-сообщения TVSources)
         val busy = plsBusy ?: epgBusy
         if (busy != null && overlay == Overlay.NONE) {
             Row(
-                Modifier.align(Alignment.TopStart).padding(16.dp).clip(RoundedCornerShape(50)).background(C.Panel)
-                    .padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                Modifier
+                    .align(Alignment.TopStart)
+                    .then(
+                        if (isTv) Modifier.padding(horizontal = TvSafe.horizontal, vertical = TvSafe.vertical)
+                        else Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(AppSpace.lg),
+                    )
+                    .clip(RoundedCornerShape(50))
+                    .background(C.PanelSolid)
+                    .border(1.dp, C.Border, RoundedCornerShape(50))
+                    .padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 CircularProgressIndicator(Modifier.size(14.dp), color = C.Accent2, strokeWidth = 2.dp)
-                Text("  $busy", color = C.Text2, fontSize = 13.sp, maxLines = 1)
+                Spacer(Modifier.width(AppSpace.sm))
+                Text(busy, color = C.Text2, fontSize = AppType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
 
         val statsShown by vm.showStats.collectAsState()
         if (statsShown && playback.channel != null && overlay == Overlay.NONE) {
-            StatsOverlay(vm, playback, Modifier.align(Alignment.TopStart).padding(top = if (busy != null && overlay == Overlay.NONE) 64.dp else 16.dp, start = 16.dp))
+            val statsTop = if (busy != null) {
+                if (isTv) TvSafe.vertical + 44.dp else AppSpace.lg + 44.dp
+            } else {
+                if (isTv) TvSafe.vertical else AppSpace.lg
+            }
+            StatsOverlay(
+                vm,
+                playback,
+                Modifier
+                    .align(Alignment.TopStart)
+                    .then(if (isTv) Modifier else Modifier.windowInsetsPadding(WindowInsets.safeDrawing))
+                    .padding(
+                        start = if (isTv) TvSafe.horizontal else AppSpace.lg,
+                        top = statsTop,
+                    ),
+            )
         }
 
-        ToastHost(toast, Modifier.align(Alignment.TopCenter))
+        ToastHost(
+            toast = toast,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .then(
+                    when {
+                        portrait -> Modifier.padding(top = portraitBar + AppSpace.xs)
+                        isTv -> Modifier.padding(top = TvSafe.vertical)
+                        else -> Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                    },
+                ),
+        )
     }
 }
 
@@ -425,105 +592,320 @@ private fun VideoSurface(vm: MainViewModel, resize: Int, modifier: Modifier = Mo
         },
         update = { it.resizeMode = resize },
         onRelease = { it.player = null },
-        modifier = modifier
+        modifier = modifier,
     )
 }
 
 @Composable
-private fun PlaybackStatus(vm: MainViewModel, s: PlaybackState, isTv: Boolean, modifier: Modifier) {
-    val channel = s.channel
-    when {
-        s.error != null -> Column(
-            modifier.widthIn(max = 520.dp).clip(RoundedCornerShape(20.dp)).background(C.Panel).padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(s.channel?.name ?: "", color = C.Text, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.playback_failed, s.error.orEmpty()), color = C.Text2, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
-            Text(stringResource(R.string.playback_sources_checked, s.channel?.variants?.size ?: 0), color = C.Text3, fontSize = 13.sp)
-            Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FocusItem(Modifier.clip(RoundedCornerShape(12.dp)).background(C.Accent), onClick = { vm.controller.retry() }) { _ ->
-                    Text(stringResource(R.string.action_retry), color = C.OnAccent, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
-                }
-            }
-            Text(
-                if (isTv) stringResource(R.string.hint_tv_keys) else stringResource(R.string.hint_touch),
-                color = C.Text3,
-                fontSize = 12.sp,
-                modifier = Modifier.padding(top = 10.dp),
-            )
-        }
-        s.buffering && channel != null -> Column(
-            modifier.clip(RoundedCornerShape(16.dp)).background(C.Panel).padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            CircularProgressIndicator(Modifier.size(30.dp), color = C.Accent, strokeWidth = 3.dp)
-            val source = channel.variants.getOrNull(s.variantIndex)?.sourceName
-            Text(stringResource(R.string.connecting, source ?: channel.name, s.variantIndex + 1, channel.variants.size),
-                color = C.Text, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+private fun PauseHud(isTv: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(AppRadius.card))
+            .background(C.PanelSolid)
+            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+            .padding(horizontal = AppSpace.xl, vertical = AppSpace.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpace.md),
+    ) {
+        Icon(painterResource(R.drawable.ic_pause), null, tint = C.Text, modifier = Modifier.size(28.dp))
+        Column {
+            Text(stringResource(R.string.paused_label), color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold)
+            if (isTv) Text(stringResource(R.string.pause_hint_tv), color = C.Text3, fontSize = AppType.caption)
         }
     }
 }
 
 @Composable
-private fun InfoBar(vm: MainViewModel, ch: Channel, s: PlaybackState, now: Long, wide: Boolean, showChannelButtons: Boolean) {
+private fun SeekHud(text: String, forward: Boolean, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .clip(RoundedCornerShape(AppRadius.card))
+            .background(C.PanelSolid)
+            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+            .padding(horizontal = AppSpace.xl, vertical = AppSpace.md),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(AppSpace.sm),
+    ) {
+        Icon(
+            painterResource(if (forward) R.drawable.ic_fast_forward else R.drawable.ic_rewind),
+            null,
+            tint = C.Accent2,
+            modifier = Modifier.size(24.dp),
+        )
+        Text(text, color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun PlaybackStatus(
+    vm: MainViewModel,
+    s: PlaybackState,
+    isTv: Boolean,
+    compact: Boolean,
+    onChannels: () -> Unit,
+    modifier: Modifier,
+) {
+    val channel = s.channel
+    when {
+        s.error != null -> {
+            val retryFr = remember { FocusRequester() }
+            LaunchedEffect(s.error) {
+                delay(80)
+                runCatching { retryFr.requestFocus() }
+            }
+            Column(
+                modifier
+                    .widthIn(max = 520.dp)
+                    .clip(RoundedCornerShape(AppRadius.card))
+                    .background(C.PanelSolid)
+                    .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+                    .onKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
+                        when (e.key) {
+                            Key.DirectionUp -> { vm.zapForward(); true }
+                            Key.DirectionDown -> { vm.zapBackward(); true }
+                            else -> false
+                        }
+                    }
+                    .padding(if (compact) AppSpace.lg else AppSpace.xl),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    s.channel?.name ?: "",
+                    color = C.Text,
+                    fontSize = if (compact) AppType.subtitle else AppType.title,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    stringResource(R.string.playback_failed, s.error.orEmpty()),
+                    color = C.Text2,
+                    fontSize = AppType.body,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = AppSpace.xs),
+                )
+                if (!compact) {
+                    Text(
+                        stringResource(R.string.playback_sources_checked, s.channel?.variants?.size ?: 0),
+                        color = C.Text3,
+                        fontSize = AppType.caption,
+                        modifier = Modifier.padding(top = AppSpace.xs),
+                    )
+                }
+                Row(Modifier.padding(top = AppSpace.md), horizontalArrangement = Arrangement.spacedBy(AppSpace.md)) {
+                    FocusItem(
+                        containerColor = C.Accent,
+                        prominent = true,
+                        liftOnFocus = true,
+                        focusRequester = retryFr,
+                        onClick = { vm.controller.retry() },
+                    ) { _ ->
+                        Text(
+                            stringResource(R.string.action_retry),
+                            color = C.OnAccent,
+                            fontSize = AppType.body,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = AppSpace.lg, vertical = AppSpace.sm),
+                        )
+                    }
+                    FocusItem(
+                        containerColor = C.Card,
+                        borderColor = C.Border,
+                        liftOnFocus = true,
+                        onClick = onChannels,
+                    ) { _ ->
+                        Text(
+                            stringResource(R.string.nav_channels),
+                            color = C.Text,
+                            fontSize = AppType.body,
+                            modifier = Modifier.padding(horizontal = AppSpace.lg, vertical = AppSpace.sm),
+                        )
+                    }
+                }
+                if (!compact) {
+                    Text(
+                        if (isTv) stringResource(R.string.hint_tv_keys) else stringResource(R.string.hint_touch),
+                        color = C.Text3,
+                        fontSize = AppType.caption,
+                        modifier = Modifier.padding(top = AppSpace.md),
+                    )
+                }
+            }
+        }
+        s.buffering && channel != null -> Column(
+            modifier
+                .clip(RoundedCornerShape(AppRadius.card))
+                .background(C.PanelSolid)
+                .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+                .padding(horizontal = AppSpace.lg, vertical = AppSpace.md),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            CircularProgressIndicator(Modifier.size(28.dp), color = C.Accent2, strokeWidth = 3.dp)
+            val source = channel.variants.getOrNull(s.variantIndex)?.sourceName
+            Text(
+                stringResource(R.string.connecting, source ?: channel.name, s.variantIndex + 1, channel.variants.size),
+                color = C.Text,
+                fontSize = AppType.caption,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = AppSpace.sm),
+            )
+        }
+    }
+}
+
+@Composable
+private fun InfoBar(
+    vm: MainViewModel,
+    ch: Channel,
+    s: PlaybackState,
+    now: Long,
+    isTv: Boolean,
+    wide: Boolean,
+    showChannelButtons: Boolean,
+    seekTick: Int,
+) {
     val epgVersion by vm.epgVersion.collectAsState()
-    val nn by produceState(emptyList<Programme>(), ch.key, epgVersion, now / 60_000) { value = vm.nowNext(ch) }
+    val nn by produceState(vm.peekNowNext(ch, now).orEmpty(), ch.key, epgVersion, now / 60_000) {
+        value = vm.nowNextCached(ch, now)
+    }
+    var archivePosMs by remember(s.archive, seekTick) {
+        mutableLongStateOf(vm.controller.player.currentPosition)
+    }
+    LaunchedEffect(s.archive != null, seekTick) {
+        if (s.archive == null) return@LaunchedEffect
+        while (true) {
+            archivePosMs = vm.controller.player.currentPosition
+            delay(1000)
+        }
+    }
     val fav by vm.favorites.collectAsState()
     val cur = s.archive ?: nn.firstOrNull { it.isNow(now) }
     val next = if (s.archive == null) nn.firstOrNull { it.start >= (cur?.stop ?: now) } else null
     val variant = ch.variants.getOrNull(s.variantIndex)
     val source = variant?.let { "${it.sourceName}${if (ch.variants.size > 1) " ${s.variantIndex + 1}/${ch.variants.size}" else ""}" }
+
     Column(
-        Modifier.fillMaxWidth().background(C.bottomBrush)
-            .padding(horizontal = if (wide) 32.dp else 16.dp)
-            .padding(top = if (wide) 60.dp else 24.dp, bottom = if (showChannelButtons) 12.dp else 28.dp),
+        Modifier
+            .fillMaxWidth()
+            .background(C.bottomBrush)
+            .padding(horizontal = if (isTv) TvSafe.horizontal else AppSpace.lg)
+            .padding(
+                top = if (wide) AppSpace.xxl else AppSpace.xl,
+                bottom = if (isTv) TvSafe.vertical else if (showChannelButtons) AppSpace.md else AppSpace.xl,
+            ),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.clip(RoundedCornerShape(12.dp)).background(C.accentBrush).padding(horizontal = 12.dp, vertical = 6.dp)) {
-                Text(ch.number.toString(), color = C.OnAccent, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+            Box(Modifier.clip(RoundedCornerShape(AppRadius.panel)).background(C.accentBrush).padding(horizontal = AppSpace.md, vertical = AppSpace.sm)) {
+                Text(ch.number.toString(), color = C.OnAccent, fontSize = AppType.title, fontWeight = FontWeight.Bold)
             }
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(AppSpace.md))
             LogoImage(vm.logoOf(ch), ch.name, if (wide) 52.dp else 40.dp)
-            Column(Modifier.weight(1f).padding(start = 16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(ch.name, color = C.Text, fontSize = if (wide) 26.sp else 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, false))
+            Column(Modifier.weight(1f).padding(start = AppSpace.lg)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(AppSpace.sm)) {
+                    Text(
+                        ch.name,
+                        color = C.Text,
+                        fontSize = if (wide) AppType.display else AppType.title,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, false),
+                    )
                     if (ch.key in fav) Icon(Icons.Default.Star, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
-                    if (s.archive != null) Pill(stringResource(R.string.pill_archive), color = C.Blue, textColor = C.OnAccent) else Pill(stringResource(R.string.pill_live), color = C.Red, textColor = C.OnAccent)
-                    if (wide && source != null) Pill(source)
+                    if (s.archive != null) {
+                        Pill(stringResource(R.string.pill_archive), color = C.Blue, textColor = C.OnInfo)
+                    } else {
+                        Pill(stringResource(R.string.pill_live), color = C.LiveBg, textColor = C.OnLive)
+                    }
+                    if (wide && source != null) Pill(source, color = C.Card, textColor = C.Text2)
                 }
                 if (!wide && source != null) {
-                    Text(source, color = C.Text2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(source, color = C.Text2, fontSize = AppType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 val st by rememberStats(vm, 2000)
                 st.summary().takeIf { it.isNotBlank() }?.let {
-                    Text(it, color = C.Text3, fontSize = 13.sp, maxLines = 1, modifier = Modifier.padding(top = 2.dp))
+                    Text(it, color = C.Text3, fontSize = AppType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = AppSpace.xs))
                 }
                 if (cur != null) {
-                    Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${hhmm(cur.start)} – ${hhmm(cur.stop)}", color = C.Accent2, fontSize = 15.sp)
-                        Text("   ${cur.title}", color = C.Text, fontSize = 17.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row(Modifier.padding(top = AppSpace.sm), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${hhmm(cur.start)} – ${hhmm(cur.stop)}", color = C.Accent2, fontSize = AppType.subtitle, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.width(AppSpace.md))
+                        Text(cur.title, color = C.Text, fontSize = AppType.subtitle, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     val progress = if (s.archive != null) {
-                        val pos = vm.controller.player.currentPosition
                         val dur = vm.controller.player.duration.takeIf { it > 0 }
                             ?: (cur.stop - cur.start).coerceAtLeast(1)
-                        (pos.toFloat() / dur).coerceIn(0f, 1f)
-                    } else cur.progress(now)
-                    ProgressLine(progress, Modifier.fillMaxWidth(if (wide) 0.75f else 1f).padding(top = 8.dp), height = 4.dp)
+                        (archivePosMs.toFloat() / dur).coerceIn(0f, 1f)
+                    } else {
+                        cur.progress(now)
+                    }
+                    ProgressLine(progress, Modifier.fillMaxWidth(if (wide) 0.78f else 1f).padding(top = AppSpace.sm), height = 4.dp)
                 } else {
-                    Text(groupLabel(ch.group), color = C.Text3, fontSize = 15.sp, modifier = Modifier.padding(top = 6.dp))
+                    Text(groupLabel(ch.group), color = C.Text3, fontSize = AppType.body, modifier = Modifier.padding(top = AppSpace.xs))
                 }
-                if (next != null) Text(stringResource(R.string.next_programme, hhmm(next.start), next.title), color = C.Text3, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-                if (s.archive != null) FocusItem(onClick = vm::backToLive) { _ ->
-                    Text(stringResource(R.string.action_back_to_live), color = C.Blue, fontSize = 13.sp, modifier = Modifier.padding(6.dp))
+                if (next != null) {
+                    Text(
+                        stringResource(R.string.next_programme, hhmm(next.start), next.title),
+                        color = C.Text3,
+                        fontSize = AppType.body,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = AppSpace.xs),
+                    )
+                }
+                if (s.archive != null && !isTv) {
+                    FocusItem(
+                        containerColor = C.Card,
+                        borderColor = C.Border,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        modifier = Modifier.padding(top = AppSpace.sm),
+                        onClick = vm::backToLive,
+                    ) { _ ->
+                        Text(
+                            stringResource(R.string.action_back_to_live),
+                            color = C.Accent2,
+                            fontSize = AppType.caption,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.xs),
+                        )
+                    }
                 }
             }
-            if (wide) Text(hhmm(now), color = C.Text, fontSize = 30.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(start = 16.dp))
+            if (wide) {
+                Text(
+                    hhmm(now),
+                    color = C.Text,
+                    fontSize = AppType.display,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = AppSpace.lg),
+                )
+            }
+        }
+        if (isTv) {
+            val hints = if (s.archive != null) {
+                listOf(
+                    stringResource(R.string.hint_key_ok) to stringResource(R.string.hint_channels),
+                    stringResource(R.string.hint_key_lr) to stringResource(R.string.hint_seek_30s),
+                    stringResource(R.string.hint_key_menu) to stringResource(R.string.hint_stream),
+                    stringResource(R.string.hint_key_back) to stringResource(R.string.hint_back_live),
+                )
+            } else {
+                listOf(
+                    stringResource(R.string.hint_key_ud) to stringResource(R.string.hint_switch_channel),
+                    stringResource(R.string.hint_key_ok) to stringResource(R.string.hint_channels),
+                    stringResource(R.string.hint_key_lr) to stringResource(R.string.hint_guide),
+                    stringResource(R.string.hint_key_menu) to stringResource(R.string.hint_stream),
+                )
+            }
+            RemoteHintBar(hints, Modifier.padding(top = AppSpace.md))
         }
         if (showChannelButtons) {
             Row(
-                Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                Modifier.align(Alignment.CenterHorizontally).padding(top = AppSpace.sm),
+                horizontalArrangement = Arrangement.spacedBy(AppSpace.lg),
             ) {
                 RoundButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.zap_previous), vm::zapBackward)
                 if (vm.previousChannel() != null) {
@@ -538,115 +920,336 @@ private fun InfoBar(vm: MainViewModel, ch: Channel, s: PlaybackState, now: Long,
 @OptIn(UnstableApi::class)
 @Composable
 private fun StreamPanel(
-    vm: MainViewModel, s: PlaybackState, resize: Int, onResize: (Int) -> Unit,
-    onSettings: () -> Unit, onClose: () -> Unit, modifier: Modifier,
+    vm: MainViewModel,
+    s: PlaybackState,
+    isTv: Boolean,
+    wide: Boolean,
+    resize: Int,
+    onResize: (Int) -> Unit,
+    onSettings: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier,
 ) {
     val ch = s.channel
-    // Дешёвый вызов (несколько групп треков) — читаем напрямую, иначе список
-    // протухает при смене треков без смены videoInfo.
-    val qualities = vm.controller.qualities()
+    val qualityRev by vm.qualityRevision.collectAsState()
+    val fav by vm.favorites.collectAsState()
+    val shown by vm.showStats.collectAsState()
+    val qualities = remember(s.channel?.key, s.variantIndex, s.videoInfo, qualityRev) {
+        vm.controller.qualities()
+    }
     val fr = remember { FocusRequester() }
     val modes = listOf(
         AspectRatioFrameLayout.RESIZE_MODE_FIT to stringResource(R.string.image_fit),
         AspectRatioFrameLayout.RESIZE_MODE_ZOOM to stringResource(R.string.image_zoom),
         AspectRatioFrameLayout.RESIZE_MODE_FILL to stringResource(R.string.image_fill),
     )
-    LaunchedEffect(Unit) { delay(80); runCatching { fr.requestFocus() } }
-    Column(
-        modifier.fillMaxHeight().width(400.dp).background(C.Panel).padding(20.dp)
-    ) {
-        Text(stringResource(R.string.stream_title), color = C.Text, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        s.userAgent?.let { Text("UA: $it", color = C.Text3, fontSize = 12.sp, maxLines = 3, modifier = Modifier.padding(top = 4.dp)) }
-        LazyColumn(Modifier.weight(1f).padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    LaunchedEffect(Unit) {
+        delay(80)
+        runCatching { fr.requestFocus() }
+    }
+
+    val drawerShape = if (wide) RoundedCornerShape(AppRadius.card) else RoundedCornerShape(0.dp)
+    val drawerContainer = if (wide) {
+        modifier
+            .then(
+                if (isTv) Modifier.padding(end = TvSafe.horizontal, top = TvSafe.vertical, bottom = TvSafe.vertical)
+                else Modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(AppSpace.lg),
+            )
+            .fillMaxHeight()
+            .width(420.dp)
+            .clip(drawerShape)
+            .background(C.PanelSolid)
+            .border(1.dp, C.Border, drawerShape)
+            .padding(AppSpace.xl)
+    } else {
+        modifier
+            .fillMaxSize()
+            .background(C.PanelSolid)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(AppSpace.lg)
+    }
+
+    Column(drawerContainer) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                stringResource(R.string.stream_title),
+                color = C.Text,
+                fontSize = AppType.title,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+            )
+            if (!isTv) {
+                FocusItem(shape = CircleShape, modifier = Modifier.size(48.dp), onClick = onClose) { _ ->
+                    Icon(
+                        Icons.Default.Close,
+                        stringResource(R.string.action_close),
+                        tint = C.Text2,
+                        modifier = Modifier.align(Alignment.Center),
+                    )
+                }
+            }
+        }
+        LazyColumn(
+            Modifier.weight(1f).padding(top = AppSpace.sm),
+            contentPadding = PaddingValues(AppSpace.xs),
+            verticalArrangement = Arrangement.spacedBy(AppSpace.xs),
+        ) {
             if (ch != null && ch.variants.size > 1) {
                 item { Section(stringResource(R.string.section_source)) }
                 items(ch.variants.size, key = { i -> ch.variants.getOrNull(i)?.url ?: i }) { i ->
                     val v = ch.variants[i]
-                    FocusItem(Modifier.fillMaxWidth(), selected = i == s.variantIndex, focusRequester = if (i == s.variantIndex) fr else null,
-                        onClick = { vm.selectVariant(ch, i); onClose() }) { _ ->
-                        Column(Modifier.padding(12.dp)) {
-                            Text("${i + 1}. ${v.sourceName}" + (if (i == s.variantIndex) "  ▶" else ""), color = C.Text, fontSize = 15.sp)
-                            val status = when (StreamChecker.status(v.url)) {
-                                StreamChecker.Health.PLAYING -> stringResource(R.string.stream_status_playing)
-                                StreamChecker.Health.REACHABLE -> stringResource(R.string.stream_status_reachable)
-                                StreamChecker.Health.UNAVAILABLE -> stringResource(R.string.stream_status_unavailable)
-                                null -> stringResource(R.string.stream_status_unknown)
+                    val active = i == s.variantIndex
+                    FocusItem(
+                        Modifier.fillMaxWidth(),
+                        selected = active,
+                        containerColor = C.Card,
+                        borderColor = C.Border,
+                        shape = RoundedCornerShape(AppRadius.control),
+                        focusRequester = if (active) fr else null,
+                        onClick = { vm.selectVariant(ch, i); onClose() },
+                    ) { _ ->
+                        Row(
+                            Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            SelectedBar(active)
+                            Spacer(Modifier.width(AppSpace.sm))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "${i + 1}. ${v.sourceName}",
+                                    color = C.Text,
+                                    fontSize = AppType.body,
+                                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                val status = when (StreamChecker.status(v.url)) {
+                                    StreamChecker.Health.PLAYING -> stringResource(R.string.stream_status_playing)
+                                    StreamChecker.Health.REACHABLE -> stringResource(R.string.stream_status_reachable)
+                                    StreamChecker.Health.UNAVAILABLE -> stringResource(R.string.stream_status_unavailable)
+                                    null -> stringResource(R.string.stream_status_unknown)
+                                }
+                                Text("${variantInfo(v)} · $status", color = C.Text3, fontSize = AppType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            Text("${variantInfo(v)} · $status", color = C.Text2, fontSize = 12.sp, maxLines = 1)
-                            Text(v.url, color = C.Text3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (active) {
+                                Icon(Icons.Default.Check, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
+                            }
                         }
+                    }
+                }
+            }
+            item { Section(stringResource(R.string.section_quality)) }
+            item {
+                val autoSelected = remember(qualityRev, qualities) { vm.controller.isQualitySelected(null) }
+                FocusItem(
+                    Modifier.fillMaxWidth(),
+                    selected = autoSelected,
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    focusRequester = if (ch == null || ch.variants.size < 2) fr else null,
+                    onClick = { vm.selectQuality(null); onClose() },
+                ) { _ ->
+                    Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+                        SelectedBar(autoSelected)
+                        Spacer(Modifier.width(AppSpace.sm))
+                        Text(stringResource(R.string.quality_auto), color = C.Text, fontSize = AppType.body, modifier = Modifier.weight(1f))
+                        if (autoSelected) Icon(Icons.Default.Check, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            items(qualities, key = { it.label }) { q ->
+                val qSelected = remember(qualityRev, q) { vm.controller.isQualitySelected(q) }
+                FocusItem(
+                    Modifier.fillMaxWidth(),
+                    selected = qSelected,
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onClick = { vm.selectQuality(q); onClose() },
+                ) { _ ->
+                    Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+                        SelectedBar(qSelected)
+                        Spacer(Modifier.width(AppSpace.sm))
+                        Text(q.label, color = if (qSelected) C.Text else C.Text2, fontSize = AppType.body, modifier = Modifier.weight(1f))
+                        if (qSelected) Icon(Icons.Default.Check, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            item { Section(stringResource(R.string.section_image)) }
+            items(modes, key = { it.first }) { (m, label) ->
+                val selected = m == resize
+                FocusItem(
+                    Modifier.fillMaxWidth(),
+                    selected = selected,
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onClick = { onResize(m) },
+                ) { _ ->
+                    Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+                        SelectedBar(selected)
+                        Spacer(Modifier.width(AppSpace.sm))
+                        Text(label, color = if (selected) C.Text else C.Text2, fontSize = AppType.body, modifier = Modifier.weight(1f))
+                        if (selected) Icon(Icons.Default.Check, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            item { Section(stringResource(R.string.section_other)) }
+            if (ch != null) item {
+                val isFav = ch.key in fav
+                FocusItem(
+                    Modifier.fillMaxWidth(),
+                    selected = isFav,
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onClick = { vm.toggleFavorite(ch) },
+                ) { _ ->
+                    Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Star, null, tint = if (isFav) C.Accent2 else C.Text3, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(AppSpace.sm))
+                        Text(
+                            stringResource(if (isFav) R.string.action_favorite_remove else R.string.action_favorite_add),
+                            color = C.Text,
+                            fontSize = AppType.body,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                }
+            }
+            item {
+                FocusItem(
+                    Modifier.fillMaxWidth(),
+                    selected = shown,
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onClick = { vm.toggleStats() },
+                ) { _ ->
+                    Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (shown) stringResource(R.string.stats_toggle_hide) else stringResource(R.string.stats_toggle_show),
+                            color = C.Text,
+                            fontSize = AppType.body,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (shown) Icon(Icons.Default.Check, null, tint = C.Accent2, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+            item {
+                FocusItem(
+                    Modifier.fillMaxWidth(),
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    shape = RoundedCornerShape(AppRadius.control),
+                    onClick = onSettings,
+                ) { _ ->
+                    Row(Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.md), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Settings, null, tint = C.Text2, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(AppSpace.sm))
+                        Text(stringResource(R.string.nav_settings), color = C.Text, fontSize = AppType.body)
                     }
                 }
             }
             item { Section(stringResource(R.string.section_stream_info)) }
             item { StatsTable(vm, s) }
-            item {
-                val shown by vm.showStats.collectAsState()
-                FocusItem(Modifier.fillMaxWidth(), onClick = { vm.toggleStats() }) { _ ->
-                    Text(if (shown) stringResource(R.string.stats_toggle_hide) else stringResource(R.string.stats_toggle_show), color = C.Text2, fontSize = 15.sp, modifier = Modifier.padding(12.dp))
-                }
-            }
-            item { Section(stringResource(R.string.section_quality)) }
-            item {
-                FocusItem(Modifier.fillMaxWidth(), focusRequester = if (ch == null || ch.variants.size < 2) fr else null,
-                    onClick = { vm.controller.setQuality(null); onClose() }) { _ ->
-                    Text(stringResource(R.string.quality_auto), color = C.Text, fontSize = 15.sp, modifier = Modifier.padding(12.dp))
-                }
-            }
-            items(qualities) { q ->
-                FocusItem(Modifier.fillMaxWidth(), onClick = { vm.controller.setQuality(q); onClose() }) { _ ->
-                    Text(q.label, color = C.Text2, fontSize = 15.sp, modifier = Modifier.padding(12.dp))
-                }
-            }
-            item { Section(stringResource(R.string.section_image)) }
-            items(modes) { (m, label) ->
-                FocusItem(Modifier.fillMaxWidth(), selected = m == resize, onClick = { onResize(m) }) { _ ->
-                    Text(label, color = C.Text2, fontSize = 15.sp, modifier = Modifier.padding(12.dp))
-                }
-            }
-            item { Section(stringResource(R.string.section_other)) }
-            if (ch != null) item {
-                FocusItem(Modifier.fillMaxWidth(), onClick = { vm.toggleFavorite(ch) }) { _ ->
-                    Text(stringResource(R.string.action_favorite_toggle), color = C.Text2, fontSize = 15.sp, modifier = Modifier.padding(12.dp))
-                }
-            }
-            item {
-                FocusItem(Modifier.fillMaxWidth(), onClick = onSettings) { _ ->
-                    Text(stringResource(R.string.nav_settings), color = C.Text2, fontSize = 15.sp, modifier = Modifier.padding(12.dp))
-                }
-            }
         }
     }
 }
 
 @Composable
 private fun Section(text: String) {
-    Text(text, color = C.Accent2, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(start = 8.dp, top = 12.dp, bottom = 4.dp))
+    Text(
+        text,
+        color = C.Accent2,
+        fontSize = AppType.caption,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = AppSpace.xs, top = AppSpace.md, bottom = AppSpace.xs),
+    )
 }
 
 @Composable
 private fun Welcome(busy: String?, onRefresh: () -> Unit, onSettings: () -> Unit, modifier: Modifier) {
     val fr = remember { FocusRequester() }
-    LaunchedEffect(busy == null) { if (busy == null) { delay(100); runCatching { fr.requestFocus() } } }
+    LaunchedEffect(busy == null) {
+        if (busy == null) {
+            delay(100)
+            runCatching { fr.requestFocus() }
+        }
+    }
     Column(
-        modifier.widthIn(max = 560.dp).padding(24.dp).clip(RoundedCornerShape(24.dp)).background(C.Panel).padding(28.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        modifier
+            .widthIn(max = 560.dp)
+            .padding(AppSpace.xl)
+            .clip(RoundedCornerShape(AppRadius.card))
+            .background(C.PanelSolid)
+            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card))
+            .padding(AppSpace.xxl),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Box(Modifier.size(56.dp).clip(CircleShape).background(C.accentBrush))
-        Text(stringResource(R.string.app_name), color = C.Text, fontSize = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 14.dp))
-        Text(stringResource(R.string.welcome_subtitle), color = C.Text3, fontSize = 14.sp, modifier = Modifier.padding(top = 4.dp))
-        Spacer(Modifier.height(20.dp))
+        Box(
+            Modifier
+                .size(68.dp)
+                .clip(RoundedCornerShape(AppRadius.card))
+                .background(C.Card)
+                .border(1.dp, C.Border, RoundedCornerShape(AppRadius.card)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painterResource(R.drawable.ic_launcher_foreground),
+                contentDescription = stringResource(R.string.app_name),
+                modifier = Modifier.size(64.dp),
+            )
+        }
+        Text(
+            stringResource(R.string.app_name),
+            color = C.Text,
+            fontSize = AppType.display,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(top = AppSpace.lg),
+        )
+        Text(
+            stringResource(R.string.welcome_subtitle),
+            color = C.Text3,
+            fontSize = AppType.body,
+            modifier = Modifier.padding(top = AppSpace.xs),
+        )
+        Spacer(Modifier.height(AppSpace.xl))
         if (busy != null) {
-            CircularProgressIndicator(color = C.Accent)
-            Text(busy, color = C.Text2, fontSize = 15.sp, modifier = Modifier.padding(top = 12.dp))
+            CircularProgressIndicator(color = C.Accent2)
+            Text(busy, color = C.Text2, fontSize = AppType.body, modifier = Modifier.padding(top = AppSpace.md))
         } else {
-            Text(stringResource(R.string.channels_not_loaded), color = C.Text2, fontSize = 15.sp)
-            Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FocusItem(Modifier.clip(RoundedCornerShape(12.dp)).background(C.Accent), focusRequester = fr, onClick = onRefresh) { _ ->
-                    Text(stringResource(R.string.action_load_playlists), color = C.OnAccent, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+            Text(stringResource(R.string.channels_not_loaded), color = C.Text2, fontSize = AppType.body)
+            Row(Modifier.padding(top = AppSpace.lg), horizontalArrangement = Arrangement.spacedBy(AppSpace.md)) {
+                FocusItem(
+                    containerColor = C.Accent,
+                    prominent = true,
+                    liftOnFocus = true,
+                    focusRequester = fr,
+                    onClick = onRefresh,
+                ) { _ ->
+                    Text(
+                        stringResource(R.string.action_load_playlists),
+                        color = C.OnAccent,
+                        fontSize = AppType.body,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = AppSpace.lg, vertical = AppSpace.sm),
+                    )
                 }
-                FocusItem(Modifier.clip(RoundedCornerShape(12.dp)).background(C.Card), onClick = onSettings) { _ ->
-                    Text(stringResource(R.string.nav_settings), color = C.Text2, modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp))
+                FocusItem(
+                    containerColor = C.Card,
+                    borderColor = C.Border,
+                    liftOnFocus = true,
+                    onClick = onSettings,
+                ) { _ ->
+                    Text(
+                        stringResource(R.string.nav_settings),
+                        color = C.Text,
+                        fontSize = AppType.body,
+                        modifier = Modifier.padding(horizontal = AppSpace.lg, vertical = AppSpace.sm),
+                    )
                 }
             }
         }
@@ -655,10 +1258,15 @@ private fun Welcome(busy: String?, onRefresh: () -> Unit, onSettings: () -> Unit
 
 @Composable
 private fun RoundButton(icon: ImageVector, label: String, onClick: () -> Unit) {
-    FocusItem(Modifier.size(48.dp), shape = RoundedCornerShape(50), onClick = onClick) { _ ->
-        Box(Modifier.size(48.dp).clip(CircleShape).background(C.Panel), contentAlignment = Alignment.Center) {
-            Icon(icon, label, tint = C.Text)
-        }
+    FocusItem(
+        Modifier.size(48.dp),
+        containerColor = C.PanelSolid,
+        borderColor = C.Border,
+        liftOnFocus = true,
+        shape = CircleShape,
+        onClick = onClick,
+    ) { _ ->
+        Icon(icon, label, tint = C.Text, modifier = Modifier.align(Alignment.Center))
     }
 }
 
@@ -672,12 +1280,18 @@ private fun ToastHost(toast: Toast?, modifier: Modifier) {
         if (visible?.id == toast.id) visible = null
     }
     AnimatedVisibility(visible != null, enter = fadeIn() + slideInVertically { -it }, exit = fadeOut(), modifier = modifier) {
-        Box(Modifier.padding(16.dp).clip(RoundedCornerShape(50)).background(C.PanelSolid).padding(horizontal = 18.dp, vertical = 10.dp)) {
-            Text(visible?.text ?: "", color = C.Text, fontSize = 14.sp, maxLines = 2)
+        Box(
+            Modifier
+                .padding(horizontal = AppSpace.lg, vertical = AppSpace.sm)
+                .clip(RoundedCornerShape(50))
+                .background(C.PanelSolid)
+                .border(1.dp, C.Border, RoundedCornerShape(50))
+                .padding(horizontal = AppSpace.lg, vertical = AppSpace.sm),
+        ) {
+            Text(visible?.text ?: "", color = C.Text, fontSize = AppType.body, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }
-
 
 @Composable
 private fun rememberStats(vm: MainViewModel, periodMs: Long) = produceState(StreamStats()) {
@@ -689,7 +1303,11 @@ private fun rememberStats(vm: MainViewModel, periodMs: Long) = produceState(Stre
 
 @Composable
 private fun variantInfo(v: StreamVariant): String = listOfNotNull(
-    when (v.kind) { StreamKind.WINK -> "Wink"; StreamKind.BEELINE -> "Beeline"; else -> null },
+    when (v.kind) {
+        StreamKind.WINK -> "Wink"
+        StreamKind.BEELINE -> "Beeline"
+        else -> null
+    },
     when {
         v.url.contains(".mpd", ignoreCase = true) -> "DASH"
         v.url.contains("m3u8", ignoreCase = true) -> "HLS"
@@ -749,11 +1367,18 @@ private fun statsRows(st: StreamStats, s: PlaybackState): List<Pair<String, Stri
 @Composable
 private fun StatsTable(vm: MainViewModel, s: PlaybackState) {
     val st by rememberStats(vm, 1000)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(C.Card).padding(12.dp)) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppRadius.panel))
+            .background(C.Card)
+            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.panel))
+            .padding(AppSpace.md),
+    ) {
         statsRows(st, s).forEach { (k, v) ->
             Row(Modifier.padding(vertical = 2.dp)) {
-                Text(k, color = C.Text3, fontSize = 12.sp, modifier = Modifier.width(118.dp))
-                Text(v, color = C.Text2, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(k, color = C.Text3, fontSize = AppType.caption, modifier = Modifier.width(118.dp))
+                Text(v, color = C.Text2, fontSize = AppType.caption, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -762,11 +1387,18 @@ private fun StatsTable(vm: MainViewModel, s: PlaybackState) {
 @Composable
 private fun StatsOverlay(vm: MainViewModel, s: PlaybackState, modifier: Modifier) {
     val st by rememberStats(vm, 1000)
-    Column(modifier.widthIn(max = 420.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xB3000000)).padding(10.dp)) {
+    Column(
+        modifier
+            .widthIn(max = 420.dp)
+            .clip(RoundedCornerShape(AppRadius.panel))
+            .background(C.Panel)
+            .border(1.dp, C.Border, RoundedCornerShape(AppRadius.panel))
+            .padding(AppSpace.md),
+    ) {
         val userAgentLabel = stringResource(R.string.stats_user_agent)
         val profileLabel = stringResource(R.string.stats_profile)
         statsRows(st, s).filter { it.first != userAgentLabel && it.first != profileLabel }.forEach { (k, v) ->
-            Text("$k: $v", color = Color(0xFFB8F5C8), fontSize = 12.sp, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("$k: $v", color = C.Green, fontSize = AppType.caption, fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }

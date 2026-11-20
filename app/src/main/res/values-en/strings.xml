@@ -19,6 +19,22 @@
     <string name="hint_tv_keys">▲▼ — next channel, OK — list</string>
     <string name="hint_touch">Tap the screen to open the controls</string>
     <string name="connecting">Connecting · %1$s %2$d/%3$d</string>
+    <string name="paused_label">Paused</string>
+    <string name="pause_hint_tv">Play / Pause — resume</string>
+    <string name="seek_backward_fmt">−%1$d s</string>
+    <string name="seek_forward_fmt">+%1$d s</string>
+
+    <string name="hint_key_ok">OK</string>
+    <string name="hint_key_back">Back</string>
+    <string name="hint_key_menu">Menu</string>
+    <string name="hint_key_ud">▲▼</string>
+    <string name="hint_key_lr">◀▶</string>
+    <string name="hint_switch_channel">Switch</string>
+    <string name="hint_channels">Channels</string>
+    <string name="hint_guide">TV guide</string>
+    <string name="hint_stream">Stream</string>
+    <string name="hint_seek_30s">±30 s</string>
+    <string name="hint_back_live">Live</string>
 
     <string name="pill_archive">ARCHIVE</string>
     <string name="pill_live">LIVE</string>
@@ -42,7 +58,8 @@
     <string name="image_zoom">Fill (crop)</string>
     <string name="image_fill">Stretch</string>
     <string name="section_other">Other</string>
-    <string name="action_favorite_toggle">★ Favourite: on/off</string>
+    <string name="action_favorite_add">Add to favourites</string>
+    <string name="action_favorite_remove">Remove from favourites</string>
 
     <string name="welcome_subtitle">Beeline • Wink TV • XMLTV programme guide</string>
     <string name="channels_not_loaded">No channels loaded yet</string>
