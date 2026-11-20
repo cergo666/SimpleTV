@@ -419,7 +419,16 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
         }
 
         if (overlay == Overlay.EPG && isTv) browseState.SaveableStateProvider("tvGuide") {
-            TvGuide(vm, now, playback.channel)
+            TvGuide(
+                vm = vm,
+                now = now,
+                active = playback.channel,
+                isTv = isTv,
+                group = group,
+                onGroup = { group = it },
+                onChannels = { vm.setOverlay(Overlay.PLAYLIST) },
+                onHome = { vm.setOverlay(Overlay.HOME) },
+            )
         }
 
         if (overlay == Overlay.PLAYLIST || (overlay == Overlay.EPG && !isTv)) browseState.SaveableStateProvider("browse") {
@@ -459,7 +468,15 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
         }
 
         if (overlay == Overlay.HOME) {
-            BrowseHome(vm, now, onChannels = { vm.setOverlay(Overlay.PLAYLIST) })
+            BrowseHome(
+                vm = vm,
+                now = now,
+                isTv = isTv,
+                onChannels = { vm.setOverlay(Overlay.PLAYLIST) },
+                onGuide = { vm.setOverlay(if (isTv) Overlay.EPG else Overlay.GUIDE) },
+                onSettings = { vm.setOverlay(Overlay.SETTINGS) },
+                onClose = { vm.closeOverlay() },
+            )
         }
 
         if (overlay == Overlay.GUIDE) {

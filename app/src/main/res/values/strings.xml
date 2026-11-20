@@ -43,6 +43,8 @@
     <string name="hint_favorite">Избранное</string>
     <string name="hint_columns">Колонки</string>
     <string name="hint_back">Назад</string>
+    <string name="hint_time">Время</string>
+    <string name="hint_navigate">Выбор</string>
 
     <!-- Info bar -->
     <string name="pill_archive">АРХИВ</string>

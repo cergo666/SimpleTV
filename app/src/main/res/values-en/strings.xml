@@ -40,6 +40,8 @@
     <string name="hint_favorite">Favourite</string>
     <string name="hint_columns">Columns</string>
     <string name="hint_back">Back</string>
+    <string name="hint_time">Time</string>
+    <string name="hint_navigate">Navigate</string>
 
     <string name="pill_archive">ARCHIVE</string>
     <string name="pill_live">LIVE</string>
