@@ -1,7 +1,7 @@
 ; Inno Setup Script for SimpleTV Desktop (Windows x64)
 ; build-windows-packages.ps1 passes the real version from version.properties.
 #ifndef AppVersion
-  #define AppVersion "1.1.0"
+  #define AppVersion "1.2.0"
 #endif
 
 #ifndef SourceDir
