@@ -37,6 +37,8 @@ SetupIconFile=..\icon.ico
 UninstallDisplayIcon={app}\SimpleTV.exe
 Compression=lzma2/ultra64
 SolidCompression=yes
+CloseApplications=yes
+RestartApplications=no
 WizardStyle=modern
 PrivilegesRequiredOverridesAllowed=commandline dialog
 
