@@ -2,7 +2,7 @@ name: simpletv
 description: "SimpleTV Desktop (Windows & Linux)"
 publish_to: 'none'
 
-version: 1.2.0+1200
+version: 1.3.0+1300
 
 environment:
   sdk: ^3.13.7
