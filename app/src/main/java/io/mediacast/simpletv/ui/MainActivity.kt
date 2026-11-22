@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        resumePlayback = savedInstanceState?.getBoolean(STATE_RESUME_PLAYBACK) ?: false
         if (effectiveIsTv(this, vm.settings.uiMode)) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
         }
@@ -93,6 +94,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private var resumePlayback = false
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(STATE_RESUME_PLAYBACK, resumePlayback)
+    }
 
     override fun onStop() {
         super.onStop()
@@ -145,6 +151,10 @@ class MainActivity : ComponentActivity() {
             }
         }
         return super.dispatchKeyEvent(event)
+    }
+
+    companion object {
+        private const val STATE_RESUME_PLAYBACK = "resume_playback"
     }
 }
 

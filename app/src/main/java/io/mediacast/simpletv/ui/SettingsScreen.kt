@@ -881,7 +881,7 @@ private fun CycleRow(
 
 @Composable
 private fun EditDialog(req: EditRequest, isTv: Boolean, onCancel: () -> Unit, onDone: (List<String>) -> Unit) {
-    val values = remember(req) { req.fields.map { mutableStateOf(it.second) } }
+    var values by rememberSaveable(req) { mutableStateOf(req.fields.map { it.second }) }
     val fr = remember { FocusRequester() }
     LaunchedEffect(req) {
         delay(80)
@@ -909,8 +909,10 @@ private fun EditDialog(req: EditRequest, isTv: Boolean, onCancel: () -> Unit, on
             Text(req.title, color = C.Text, fontSize = AppType.title, fontWeight = FontWeight.Bold)
             req.fields.forEachIndexed { i, (label, _) ->
                 OutlinedTextField(
-                    value = values[i].value,
-                    onValueChange = { values[i].value = it },
+                    value = values[i],
+                    onValueChange = { newValue ->
+                        values = values.toMutableList().also { it[i] = newValue }
+                    },
                     label = { Text(label) },
                     singleLine = req.singleLine,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -942,7 +944,7 @@ private fun EditDialog(req: EditRequest, isTv: Boolean, onCancel: () -> Unit, on
                         containerColor = C.Card,
                         borderColor = C.Border,
                         shape = RoundedCornerShape(AppRadius.control),
-                        onClick = { values[0].value = ua },
+                        onClick = { values = values.toMutableList().also { it[0] = ua } },
                     ) { _ ->
                         Text(label, color = C.Text2, fontSize = AppType.body, modifier = Modifier.padding(horizontal = AppSpace.md, vertical = AppSpace.sm))
                     }
@@ -954,7 +956,7 @@ private fun EditDialog(req: EditRequest, isTv: Boolean, onCancel: () -> Unit, on
                     prominent = true,
                     liftOnFocus = true,
                     shape = RoundedCornerShape(AppRadius.control),
-                    onClick = { onDone(values.map { it.value }) },
+                    onClick = { onDone(values) },
                 ) { _ ->
                     Text(
                         stringResource(R.string.action_save),
