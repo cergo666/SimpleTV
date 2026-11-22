@@ -89,7 +89,7 @@ class StatsOverlay extends StatelessWidget {
               L10n.t.drmLabel,
               variant?.clearKey != null ? L10n.t.yes : L10n.t.no,
             ),
-            _statRow(L10n.t.engine, 'libmpv / media_kit'),
+            _statRow(L10n.t.engine, L10n.t.engineValue),
           ],
         ),
       ),

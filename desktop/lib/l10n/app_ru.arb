@@ -175,7 +175,9 @@
   "stateActive": "Активно",
   "statePaused": "Пауза",
   "drmLabel": "DRM ClearKey",
+  "drmShort": "DRM",
   "engine": "Движок",
+  "engineValue": "libmpv / media_kit",
 
   "customSource": "Пользовательский",
   "noStreams": "{name}: нет доступных потоков",

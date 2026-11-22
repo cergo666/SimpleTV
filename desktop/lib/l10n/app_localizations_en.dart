@@ -517,7 +517,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get drmLabel => 'DRM ClearKey';
 
   @override
+  String get drmShort => 'DRM';
+
+  @override
   String get engine => 'Engine';
+
+  @override
+  String get engineValue => 'libmpv / media_kit';
 
   @override
   String get customSource => 'Custom';

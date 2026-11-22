@@ -161,7 +161,9 @@
   "stateActive": "Active",
   "statePaused": "Paused",
   "drmLabel": "DRM ClearKey",
+  "drmShort": "DRM",
   "engine": "Engine",
+  "engineValue": "libmpv / media_kit",
 
   "customSource": "Custom",
   "noStreams": "{name}: no available streams",

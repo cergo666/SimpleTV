@@ -1022,11 +1022,23 @@ abstract class AppLocalizations {
   /// **'DRM ClearKey'**
   String get drmLabel;
 
+  /// No description provided for @drmShort.
+  ///
+  /// In ru, this message translates to:
+  /// **'DRM'**
+  String get drmShort;
+
   /// No description provided for @engine.
   ///
   /// In ru, this message translates to:
   /// **'Движок'**
   String get engine;
+
+  /// No description provided for @engineValue.
+  ///
+  /// In ru, this message translates to:
+  /// **'libmpv / media_kit'**
+  String get engineValue;
 
   /// No description provided for @customSource.
   ///

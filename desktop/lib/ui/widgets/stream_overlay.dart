@@ -174,7 +174,7 @@ class StreamOverlay extends StatelessWidget {
                                 ),
                               ),
                               child: Text(
-                                'DRM',
+                                L10n.t.drmShort,
                                 style: TextStyle(
                                   fontSize: AppType.caption,
                                   fontWeight: FontWeight.bold,
