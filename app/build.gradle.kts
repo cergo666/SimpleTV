@@ -30,33 +30,40 @@ fun signingValue(
 ): String? = System.getenv(env)?.ifBlank { null } ?: keystoreProps.getProperty(prop)
 val releaseStoreFile: String? = signingValue("SIGNING_STORE_FILE", "storeFile")
 val releaseSigner =
-    releaseStoreFile?.let { path ->
-        val storePassword =
-            requireNotNull(signingValue("SIGNING_STORE_PASSWORD", "storePassword")) {
-                "Release signing store password is required"
-            }
-        val keyAlias =
-            requireNotNull(signingValue("SIGNING_KEY_ALIAS", "keyAlias")) {
-                "Release signing key alias is required"
-            }
-        val store = KeyStore.getInstance(rootProject.file(path), storePassword.toCharArray())
-        val certificate = requireNotNull(store.getCertificate(keyAlias)) { "Release signing certificate not found" }
-        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.encoded))
-    }.orEmpty()
+    releaseStoreFile
+        ?.let { path ->
+            val storePassword =
+                requireNotNull(signingValue("SIGNING_STORE_PASSWORD", "storePassword")) {
+                    "Release signing store password is required"
+                }
+            val keyAlias =
+                requireNotNull(signingValue("SIGNING_KEY_ALIAS", "keyAlias")) {
+                    "Release signing key alias is required"
+                }
+            val store = KeyStore.getInstance(rootProject.file(path), storePassword.toCharArray())
+            val certificate = requireNotNull(store.getCertificate(keyAlias)) { "Release signing certificate not found" }
+            HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(certificate.encoded))
+        }.orEmpty()
 val configuredTlsPins =
-    providers.gradleProperty("simpletvTlsPins")
+    providers
+        .gradleProperty("simpletvTlsPins")
         .orElse(providers.environmentVariable("SIMPLETV_TLS_PINS"))
         .orElse("")
 
 // Единый источник версии для локальных сборок. CI передаёт VERSION_NAME/VERSION_CODE.
 val versionProps =
     Properties().apply {
-        rootProject.file("version.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+        rootProject.file("version.properties")
+            .takeIf { it.exists() }
+            ?.inputStream()
+            ?.use { load(it) }
     }
-val defaultVersionName: String = versionProps.getProperty("versionName")
-    ?: error("version.properties is missing versionName")
-val defaultVersionCode: Int = versionProps.getProperty("versionCode")?.toIntOrNull()
-    ?: error("version.properties is missing a valid versionCode")
+val defaultVersionName: String =
+    versionProps.getProperty("versionName")
+        ?: error("version.properties is missing versionName")
+val defaultVersionCode: Int =
+    versionProps.getProperty("versionCode")?.toIntOrNull()
+        ?: error("version.properties is missing a valid versionCode")
 
 android {
     namespace = "io.mediacast.simpletv"
