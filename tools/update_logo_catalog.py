@@ -10,13 +10,24 @@ from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 
-BASE = "https://raw.githubusercontent.com/iptv-org/database/master/data/"
+PINNED_COMMIT = "3b84328ec46b6ca04d750d4722f7be524318b94a"
+BASE = f"https://raw.githubusercontent.com/iptv-org/database/{PINNED_COMMIT}/data/"
 OUTPUT = Path(__file__).resolve().parents[1] / "desktop/assets/catalog/logos.json"
+REQUIRED_FIELDS = {
+    "channels.csv": {"id", "name", "alt_names", "country"},
+    "logos.csv": {"channel", "in_use", "feed", "format", "url"},
+}
 
 
 def rows(name):
     with urlopen(BASE + name, timeout=45) as response:
-        return list(csv.DictReader(io.TextIOWrapper(response, encoding="utf-8-sig")))
+        if response.status != 200:
+            raise RuntimeError(f"Unexpected HTTP status for {name}: {response.status}")
+        reader = csv.DictReader(io.TextIOWrapper(response, encoding="utf-8-sig"))
+        missing = REQUIRED_FIELDS.get(name, set()) - set(reader.fieldnames or ())
+        if missing:
+            raise RuntimeError(f"Unexpected columns in {name}: missing {sorted(missing)}")
+        return list(reader)
 
 
 def channel_key(name):

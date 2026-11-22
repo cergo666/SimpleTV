@@ -87,7 +87,7 @@ def main():
         else:
             restore(check=args.command == "check")
     except Exception as error:
-        raise SystemExit(f"Private catalog operation failed ({type(error).__name__}). Check the key and bundle.") from None
+        raise SystemExit(f"Private catalog operation failed ({type(error).__name__}). Check the key and bundle.") from error
     print(f"Private catalog {args.command} completed ({len(paths())} files).")
 
 
