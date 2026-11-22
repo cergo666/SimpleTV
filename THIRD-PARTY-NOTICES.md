@@ -27,9 +27,9 @@ If you redistribute the bundled packages, keep the `licenses/` directory intact.
 - Kotlin, kotlinx.coroutines — Apache License 2.0.
 - Flutter and the Dart SDK — BSD 3-Clause.
 - `media_kit`, `media_kit_video` — MIT.
-- `http`, `shared_preferences`, `path_provider`, `window_manager`, `intl`,
-  `crypto`, `xml`, `desktop_drop` — BSD/MIT/Apache 2.0 as declared by their
-  upstream packages.
+- `http`, `shared_preferences`, `path_provider`, `package_info_plus`,
+  `window_manager`, `intl`, `crypto`, `xml`, `desktop_drop` — BSD/MIT/Apache
+  2.0 as declared by their upstream packages.
 
 The full dependency graph and versions are pinned in `gradle/libs.versions.toml`
 and `desktop/pubspec.lock`.
