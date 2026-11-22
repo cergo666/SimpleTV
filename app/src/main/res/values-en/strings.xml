@@ -175,6 +175,19 @@
     <string name="remote_help">TV remote: ▲▼ — channel switching, OK or ◀ — channel list, ▶ — TV guide, ◀▶ in archive — seek ±30 s, digits — channel number, Menu — stream and quality.\nIn list: long OK — favourites.\nPhone: tap — controls, swipe up/down — channels.</string>
 
     <string name="about_header">Android / Android TV IPTV player</string>
+    <string name="check_updates">Check for updates</string>
+    <string name="check_updates_desc">Check GitHub Releases for a newer version</string>
+    <string name="update_checking">Checking for updates…</string>
+    <string name="update_latest">You already have the latest version</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_text">Version %1$s is available. Download and install it now?</string>
+    <string name="update_download">Download and install</string>
+    <string name="update_later">Later</string>
+    <string name="update_downloading">Downloading version %1$s…</string>
+    <string name="update_progress">%1$d%%</string>
+    <string name="update_error">Update failed: %1$s</string>
+    <string name="update_install_permission">Allow installing apps from SimpleTV, then try again</string>
+    <string name="update_install_failed">Could not open the system installer</string>
     <string name="about_body">• Built-in TV sources and public catalogues, plus custom M3U playlists.\n• Automatic channel merging and seamless failover to backup stream sources.\n• XMLTV programme guide, show search, and catchup archive playback.\n• Designed for Android TV remotes, phones, and desktop.</string>
 
     <string name="status_never">never updated</string>

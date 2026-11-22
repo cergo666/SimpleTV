@@ -27,8 +27,12 @@ import io.mediacast.simpletv.data.Settings
 import io.mediacast.simpletv.data.SourceConfig
 import io.mediacast.simpletv.data.AndroidSettings
 import io.mediacast.simpletv.data.AndroidPlaylistRepository
+import io.mediacast.simpletv.BuildConfig
 import io.mediacast.simpletv.player.PlayerController
 import io.mediacast.simpletv.R
+import io.mediacast.simpletv.update.AppUpdate
+import io.mediacast.simpletv.update.UpdateInstallResult
+import io.mediacast.simpletv.update.UpdateManager
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
@@ -138,6 +142,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val _toast = MutableStateFlow<Toast?>(null)
     val toast: StateFlow<Toast?> = _toast.asStateFlow()
 
+    private val _update = MutableStateFlow<AppUpdate?>(null)
+    val update: StateFlow<AppUpdate?> = _update.asStateFlow()
+    private val _updateBusy = MutableStateFlow<String?>(null)
+    val updateBusy: StateFlow<String?> = _updateBusy.asStateFlow()
+    private val _updateProgress = MutableStateFlow<Float?>(null)
+    val updateProgress: StateFlow<Float?> = _updateProgress.asStateFlow()
+    private var updateJob: Job? = null
+
     private val _showStats = MutableStateFlow(settings.showStats)
     val showStats: StateFlow<Boolean> = _showStats.asStateFlow()
 
@@ -199,6 +211,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             last?.let { play(it) }
             startStreamProber()
             autoUpdate()
+            delay(3_000)
+            checkForUpdates(manual = false)
         }
         // Как планировщик SimpleTV: периодически проверяем, не пора ли обновиться
         viewModelScope.launch {
@@ -538,6 +552,57 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun removeEpgSource(src: EpgSource) {
         settings.epgSources = settings.epgSources.filter { it.id != src.id }
         refreshEpg(force = false)
+    }
+
+    // ------------------------------------------------------------ обновления приложения
+
+    fun checkForUpdates(manual: Boolean = false) {
+        if (updateJob?.isActive == true) return
+        updateJob = viewModelScope.launch {
+            if (manual) _updateBusy.value = text(R.string.update_checking)
+            val info = withContext(Dispatchers.IO) {
+                runCatching { UpdateManager.check(BuildConfig.VERSION_NAME) }.getOrNull()
+            }
+            _updateBusy.value = null
+            if (info != null) {
+                _update.value = info
+                show(text(R.string.update_available_title))
+            } else if (manual) {
+                show(text(R.string.update_latest))
+            }
+        }
+    }
+
+    fun dismissUpdate() {
+        _update.value = null
+    }
+
+    fun downloadAndInstallUpdate() {
+        val info = _update.value ?: return
+        if (updateJob?.isActive == true) return
+        updateJob = viewModelScope.launch {
+            _updateBusy.value = text(R.string.update_downloading, info.version)
+            _updateProgress.value = 0f
+            val file = withContext(Dispatchers.IO) {
+                runCatching {
+                    UpdateManager.download(getApplication(), info) { progress ->
+                        _updateProgress.value = progress
+                    }
+                }
+            }.getOrElse { error ->
+                _updateBusy.value = null
+                _updateProgress.value = null
+                show(text(R.string.update_error, error.message ?: ""))
+                return@launch
+            }
+            _updateBusy.value = null
+            _updateProgress.value = null
+            when (UpdateManager.install(getApplication(), file)) {
+                UpdateInstallResult.OPENED -> _update.value = null
+                UpdateInstallResult.NEEDS_PERMISSION -> show(text(R.string.update_install_permission))
+                UpdateInstallResult.FAILED -> show(text(R.string.update_install_failed))
+            }
+        }
     }
 
     override fun onCleared() {

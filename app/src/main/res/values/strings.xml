@@ -186,6 +186,19 @@
     <string name="remote_help">Пульт TV: ▲▼ — каналы, OK или ◀ — список каналов, ▶ — телегид, ◀▶ в архиве — перемотка ±30 с, цифры — номер канала, «Меню» — поток и качество.\nВ списке: долгое OK — избранное.\nТелефон: касание — панель, свайп вверх/вниз — каналы.</string>
 
     <string name="about_header">Android / Android TV-плеер IPTV</string>
+    <string name="check_updates">Проверить обновления</string>
+    <string name="check_updates_desc">Проверить новую версию в GitHub Releases</string>
+    <string name="update_checking">Проверка обновлений…</string>
+    <string name="update_latest">У вас уже последняя версия</string>
+    <string name="update_available_title">Доступно обновление</string>
+    <string name="update_available_text">Доступна версия %1$s. Скачать и установить сейчас?</string>
+    <string name="update_download">Скачать и установить</string>
+    <string name="update_later">Позже</string>
+    <string name="update_downloading">Загрузка версии %1$s…</string>
+    <string name="update_progress">%1$d%%</string>
+    <string name="update_error">Не удалось обновить: %1$s</string>
+    <string name="update_install_permission">Разрешите установку приложений из SimpleTV и повторите</string>
+    <string name="update_install_failed">Не удалось открыть системный установщик</string>
     <string name="about_body">• Встроенные источники ТВ и открытые каталоги, плюс поддержка собственных M3U-плейлистов.\n• Объединение одинаковых каналов и автоматическое переключение на резервный источник при сбое.\n• Телепрограмма XMLTV, поиск по передачам и просмотр архива (при наличии у канала).\n• Оптимизировано для пульта Android TV, телефонов и десктопа.</string>
 
     <string name="status_never">ещё не обновлялось</string>

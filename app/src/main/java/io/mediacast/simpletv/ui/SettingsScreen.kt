@@ -131,7 +131,7 @@ fun SettingsScreen(vm: MainViewModel, isTv: Boolean, wide: Boolean, onClose: () 
                     3 -> UaSection(vm, contentFr, bump) { edit = it }
                     4 -> PlaybackSection(vm, contentFr, bump)
                     5 -> AppearanceSection(vm, isTv, contentFr, bump)
-                    else -> AboutSection()
+                    else -> AboutSection(vm)
                 }
             }
         }
@@ -735,7 +735,8 @@ private fun accentLabel(palette: AccentPalette): String = stringResource(
 )
 
 @Composable
-private fun AboutSection() {
+private fun AboutSection(vm: MainViewModel) {
+    val busy by vm.updateBusy.collectAsState()
     LazyColumn(contentPadding = PaddingValues(AppSpace.xs)) {
         item {
             Header(stringResource(R.string.app_name) + " ${BuildConfig.VERSION_NAME}", stringResource(R.string.about_header))
@@ -746,6 +747,15 @@ private fun AboutSection() {
                     fontSize = AppType.body,
                     modifier = Modifier.padding(AppSpace.lg),
                 )
+            }
+        }
+        item {
+            ActionRow(
+                busy ?: stringResource(R.string.check_updates),
+                stringResource(R.string.check_updates_desc),
+                icon = Icons.Default.Refresh,
+            ) {
+                vm.checkForUpdates(manual = true)
             }
         }
     }

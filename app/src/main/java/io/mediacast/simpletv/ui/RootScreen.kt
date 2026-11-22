@@ -53,9 +53,12 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -99,6 +102,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import io.mediacast.simpletv.R
 import io.mediacast.simpletv.data.Channel
+import io.mediacast.simpletv.update.AppUpdate
 import io.mediacast.simpletv.data.PlaybackState
 import io.mediacast.simpletv.data.Programme
 import io.mediacast.simpletv.data.StreamChecker
@@ -124,6 +128,9 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
     val plsBusy by vm.playlistBusy.collectAsState()
     val epgBusy by vm.epgBusy.collectAsState()
     val toast by vm.toast.collectAsState()
+    val update by vm.update.collectAsState()
+    val updateBusy by vm.updateBusy.collectAsState()
+    val updateProgress by vm.updateProgress.collectAsState()
 
     val overlay by vm.overlay.collectAsState()
     var group by rememberSaveable { mutableStateOf(MainViewModel.ALL) }
@@ -608,6 +615,16 @@ fun StvRoot(vm: MainViewModel, onExit: () -> Unit, inPip: Boolean = false, onPip
                         start = if (isTv) TvSafe.horizontal else AppSpace.lg,
                         top = statsTop,
                     ),
+            )
+        }
+
+        update?.let { info ->
+            UpdateDialog(
+                update = info,
+                busy = updateBusy,
+                progress = updateProgress,
+                onInstall = { vm.downloadAndInstallUpdate() },
+                onDismiss = { if (updateBusy == null) vm.dismissUpdate() },
             )
         }
 
@@ -1322,6 +1339,54 @@ private fun RoundButton(icon: ImageVector, label: String, onClick: () -> Unit) {
     ) { _ ->
         Icon(icon, label, tint = C.Text, modifier = Modifier.align(Alignment.Center))
     }
+}
+
+@Composable
+private fun UpdateDialog(
+    update: AppUpdate,
+    busy: String?,
+    progress: Float?,
+    onInstall: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.update_available_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(AppSpace.sm)) {
+                Text(stringResource(R.string.update_available_text, update.version))
+                if (busy != null) {
+                    Text(busy, color = C.Text2, fontSize = AppType.body)
+                    if (progress != null) {
+                        LinearProgressIndicator(
+                            progress = { progress.coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth(),
+                            color = C.Accent2,
+                            trackColor = C.Border,
+                        )
+                        Text(
+                            stringResource(R.string.update_progress, (progress * 100).toInt()),
+                            color = C.Text3,
+                            fontSize = AppType.caption,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onInstall, enabled = busy == null) {
+                Text(stringResource(R.string.update_download))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = busy == null) {
+                Text(stringResource(R.string.update_later))
+            }
+        },
+        containerColor = C.PanelSolid,
+        titleContentColor = C.Text,
+        textContentColor = C.Text2,
+    )
 }
 
 @Composable
