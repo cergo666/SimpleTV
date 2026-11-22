@@ -355,7 +355,7 @@ class EpgRepository(private val context: Context, private val settings: Settings
                                     cat?.let { insPr.bindString(6, it) } ?: insPr.bindNull(6)
                                     insPr.executeInsert()
                                     sourceCount++
-                                    if (++n % 20000 == 0) progress.report(context.getString(R.string.epg_parsed_count, context.epgSourceLabel(src), n))
+                                    if (++n % 20000 == 0) progress.report(context.resources.getQuantityString(R.plurals.epg_parsed_count, n, context.epgSourceLabel(src), n))
                                 }
                             }
                         }

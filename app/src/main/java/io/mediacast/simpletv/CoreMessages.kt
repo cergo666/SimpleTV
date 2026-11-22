@@ -24,8 +24,14 @@ object CoreMessages {
                 Messages.Key.PLAYLIST_STATUS_ERROR -> string(R.string.core_playlist_status_error)
                 Messages.Key.PLAYLIST_N_OF_M -> string(R.string.core_playlist_n_of_m, args[0], args[1], args[2])
                 Messages.Key.PLAYLIST_UNAVAILABLE -> string(R.string.core_playlist_unavailable)
-                Messages.Key.PLAYLIST_CHECKING -> string(R.string.core_playlist_checking, args[0], args[1], args[2], args[3])
-                Messages.Key.PLAYLIST_RECHECKING -> string(R.string.core_playlist_rechecking, args[0], args[1], args[2], args[3])
+                Messages.Key.PLAYLIST_CHECKING -> {
+                    val working = (args[3] as Number).toInt()
+                    app.resources.getQuantityString(R.plurals.core_playlist_checking, working, args[0], args[1], args[2], working)
+                }
+                Messages.Key.PLAYLIST_RECHECKING -> {
+                    val working = (args[3] as Number).toInt()
+                    app.resources.getQuantityString(R.plurals.core_playlist_rechecking, working, args[0], args[1], args[2], working)
+                }
                 Messages.Key.RATE_MBPS -> string(R.string.core_rate_mbps, args[0])
                 Messages.Key.RATE_KBPS -> string(R.string.core_rate_kbps, args[0])
                 Messages.Key.CHANNELS_MONO -> string(R.string.core_channels_mono)
