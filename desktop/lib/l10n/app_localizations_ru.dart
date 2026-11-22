@@ -366,7 +366,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get builtIn => 'Встроенный';
 
   @override
-  String get updateError => 'Ошибка обновления';
+  String updateError(Object error) {
+    return 'Не удалось обновить: $error';
+  }
 
   @override
   String lastLoad(Object date) {
@@ -632,4 +634,38 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get openStreamError => 'Ошибка открытия потока';
+
+  @override
+  String get checkUpdates => 'Проверить обновления';
+
+  @override
+  String get checkUpdatesDesc => 'Проверить новую версию в GitHub Releases';
+
+  @override
+  String get updateChecking => 'Проверка обновлений...';
+
+  @override
+  String get updateLatest => 'У вас уже последняя версия';
+
+  @override
+  String get updateAvailableTitle => 'Доступно обновление';
+
+  @override
+  String updateAvailableText(Object version) {
+    return 'Доступна версия $version. Скачать и установить сейчас?';
+  }
+
+  @override
+  String get updateDownload => 'Скачать и установить';
+
+  @override
+  String get updateLater => 'Позже';
+
+  @override
+  String updateDownloading(Object version) {
+    return 'Загрузка версии $version...';
+  }
+
+  @override
+  String get updateInstallFailed => 'Не удалось запустить установщик';
 }

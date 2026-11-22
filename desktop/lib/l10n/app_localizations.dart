@@ -731,8 +731,8 @@ abstract class AppLocalizations {
   /// No description provided for @updateError.
   ///
   /// In ru, this message translates to:
-  /// **'Ошибка обновления'**
-  String get updateError;
+  /// **'Не удалось обновить: {error}'**
+  String updateError(Object error);
 
   /// No description provided for @lastLoad.
   ///
@@ -1201,6 +1201,66 @@ abstract class AppLocalizations {
   /// In ru, this message translates to:
   /// **'Ошибка открытия потока'**
   String get openStreamError;
+
+  /// No description provided for @checkUpdates.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверить обновления'**
+  String get checkUpdates;
+
+  /// No description provided for @checkUpdatesDesc.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверить новую версию в GitHub Releases'**
+  String get checkUpdatesDesc;
+
+  /// No description provided for @updateChecking.
+  ///
+  /// In ru, this message translates to:
+  /// **'Проверка обновлений...'**
+  String get updateChecking;
+
+  /// No description provided for @updateLatest.
+  ///
+  /// In ru, this message translates to:
+  /// **'У вас уже последняя версия'**
+  String get updateLatest;
+
+  /// No description provided for @updateAvailableTitle.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступно обновление'**
+  String get updateAvailableTitle;
+
+  /// No description provided for @updateAvailableText.
+  ///
+  /// In ru, this message translates to:
+  /// **'Доступна версия {version}. Скачать и установить сейчас?'**
+  String updateAvailableText(Object version);
+
+  /// No description provided for @updateDownload.
+  ///
+  /// In ru, this message translates to:
+  /// **'Скачать и установить'**
+  String get updateDownload;
+
+  /// No description provided for @updateLater.
+  ///
+  /// In ru, this message translates to:
+  /// **'Позже'**
+  String get updateLater;
+
+  /// No description provided for @updateDownloading.
+  ///
+  /// In ru, this message translates to:
+  /// **'Загрузка версии {version}...'**
+  String updateDownloading(Object version);
+
+  /// No description provided for @updateInstallFailed.
+  ///
+  /// In ru, this message translates to:
+  /// **'Не удалось запустить установщик'**
+  String get updateInstallFailed;
 }
 
 class _AppLocalizationsDelegate

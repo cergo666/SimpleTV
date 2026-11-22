@@ -205,5 +205,16 @@
   "loadingGuide": "Загрузка телегида: {name}...",
   "guideUpdated": "Телегид обновлён",
   "guideUpdateFailed": "Не удалось обновить телегид",
-  "openStreamError": "Ошибка открытия потока"
+  "openStreamError": "Ошибка открытия потока",
+  "checkUpdates": "Проверить обновления",
+  "checkUpdatesDesc": "Проверить новую версию в GitHub Releases",
+  "updateChecking": "Проверка обновлений...",
+  "updateLatest": "У вас уже последняя версия",
+  "updateAvailableTitle": "Доступно обновление",
+  "updateAvailableText": "Доступна версия {version}. Скачать и установить сейчас?",
+  "updateDownload": "Скачать и установить",
+  "updateLater": "Позже",
+  "updateDownloading": "Загрузка версии {version}...",
+  "updateError": "Не удалось обновить: {error}",
+  "updateInstallFailed": "Не удалось запустить установщик"
 }

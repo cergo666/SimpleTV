@@ -754,6 +754,25 @@ class _SettingsOverlayState extends State<SettingsOverlay> {
                       ),
                     ],
                   ),
+                  const Divider(color: AppColors.border, height: 28),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(L10n.t.checkUpdates),
+                    subtitle: Text(
+                      L10n.t.checkUpdatesDesc,
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: AppType.caption,
+                      ),
+                    ),
+                    trailing: OutlinedButton.icon(
+                      onPressed: widget.vm.updateBusy == null
+                          ? () => widget.vm.checkForUpdates(manual: true)
+                          : null,
+                      icon: const Icon(Icons.system_update, size: 18),
+                      label: Text(L10n.t.checkUpdates),
+                    ),
+                  ),
                 ],
               ),
             ),

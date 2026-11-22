@@ -12,6 +12,7 @@ import '../../data/services/epg_service.dart';
 import '../../data/services/player_service.dart';
 import '../../data/services/stream_checker_service.dart';
 import '../../data/services/stream_resolver.dart';
+import '../../data/services/update_service.dart';
 import '../../l10n/l10n.dart';
 import '../theme/theme.dart';
 
@@ -99,6 +100,15 @@ class PlayerViewModel extends ChangeNotifier {
 
   String? _toast;
   String? get toast => _toast;
+
+  final UpdateService updateService = UpdateService();
+  AppUpdate? _update;
+  AppUpdate? get update => _update;
+  String? _updateBusy;
+  String? get updateBusy => _updateBusy;
+  double? _updateProgress;
+  double? get updateProgress => _updateProgress;
+  bool _updateCheckInFlight = false;
 
   String _quickDigits = '';
   String get quickDigits => _quickDigits;
@@ -333,6 +343,9 @@ class PlayerViewModel extends ChangeNotifier {
       unawaited(refreshEpg(showProgress: false, force: false));
     });
     unawaited(refreshEpg(force: false));
+    unawaited(
+      Future<void>.delayed(const Duration(seconds: 3), () => checkForUpdates()),
+    );
   }
 
   Future<void> refreshPlaylists() async {
@@ -901,6 +914,72 @@ class PlayerViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> checkForUpdates({bool manual = false}) async {
+    if (_disposed || _updateCheckInFlight) return;
+    _updateCheckInFlight = true;
+    if (manual) {
+      _updateBusy = L10n.t.updateChecking;
+      notifyListeners();
+    }
+    try {
+      final info = await updateService.check();
+      if (_disposed) return;
+      if (info != null) {
+        _update = info;
+      } else if (manual) {
+        showToast(L10n.t.updateLatest);
+      }
+    } catch (error) {
+      if (manual && !_disposed) {
+        showToast(L10n.t.updateError(error.toString()));
+      }
+    } finally {
+      _updateCheckInFlight = false;
+      if (!_disposed) {
+        _updateBusy = null;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> downloadAndInstallUpdate() async {
+    final info = _update;
+    if (_disposed || info == null) return;
+    _updateBusy = L10n.t.updateDownloading(info.version);
+    _updateProgress = 0;
+    notifyListeners();
+    try {
+      final started = await updateService.install(
+        info,
+        onProgress: (progress) {
+          if (_disposed) return;
+          _updateProgress = progress;
+          notifyListeners();
+        },
+      );
+      if (!_disposed && !started) {
+        _updateBusy = null;
+        _updateProgress = null;
+        notifyListeners();
+        showToast(L10n.t.updateInstallFailed);
+      }
+    } catch (error) {
+      if (_disposed) return;
+      _updateBusy = null;
+      _updateProgress = null;
+      notifyListeners();
+      showToast(L10n.t.updateError(error.toString()));
+    }
+  }
+
+  void dismissUpdate() {
+    if (_disposed) return;
+    _update = null;
+    _updateBusy = null;
+    _updateProgress = null;
+    notifyListeners();
+  }
+
   void showToast(String message) {
     if (_disposed) return;
     _toast = message;
@@ -936,6 +1015,7 @@ class PlayerViewModel extends ChangeNotifier {
     _probeNotifyTimer?.cancel();
     streamChecker.cancelProbe();
     _playerSubscription.cancel();
+    updateService.dispose();
     playerService.dispose();
     super.dispose();
   }

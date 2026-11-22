@@ -191,5 +191,16 @@
   "loadingGuide": "Loading guide: {name}...",
   "guideUpdated": "Guide updated",
   "guideUpdateFailed": "Could not update the guide",
-  "openStreamError": "Stream open error"
+  "openStreamError": "Stream open error",
+  "checkUpdates": "Check for updates",
+  "checkUpdatesDesc": "Check GitHub Releases for a newer version",
+  "updateChecking": "Checking for updates...",
+  "updateLatest": "You already have the latest version",
+  "updateAvailableTitle": "Update available",
+  "updateAvailableText": "Version {version} is available. Download and install it now?",
+  "updateDownload": "Download and install",
+  "updateLater": "Later",
+  "updateDownloading": "Downloading version {version}...",
+  "updateError": "Update failed: {error}",
+  "updateInstallFailed": "Could not start the installer"
 }

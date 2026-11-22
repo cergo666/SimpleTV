@@ -362,7 +362,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get builtIn => 'Built-in';
 
   @override
-  String get updateError => 'Update error';
+  String updateError(Object error) {
+    return 'Update failed: $error';
+  }
 
   @override
   String lastLoad(Object date) {
@@ -625,4 +627,38 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get openStreamError => 'Stream open error';
+
+  @override
+  String get checkUpdates => 'Check for updates';
+
+  @override
+  String get checkUpdatesDesc => 'Check GitHub Releases for a newer version';
+
+  @override
+  String get updateChecking => 'Checking for updates...';
+
+  @override
+  String get updateLatest => 'You already have the latest version';
+
+  @override
+  String get updateAvailableTitle => 'Update available';
+
+  @override
+  String updateAvailableText(Object version) {
+    return 'Version $version is available. Download and install it now?';
+  }
+
+  @override
+  String get updateDownload => 'Download and install';
+
+  @override
+  String get updateLater => 'Later';
+
+  @override
+  String updateDownloading(Object version) {
+    return 'Downloading version $version...';
+  }
+
+  @override
+  String get updateInstallFailed => 'Could not start the installer';
 }

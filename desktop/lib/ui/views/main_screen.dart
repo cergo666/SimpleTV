@@ -20,6 +20,7 @@ import '../widgets/browse_home.dart';
 import '../widgets/settings_overlay.dart';
 import '../widgets/stats_overlay.dart';
 import '../widgets/stream_overlay.dart';
+import '../widgets/update_dialog.dart';
 
 class MainScreen extends StatefulWidget {
   final PlayerViewModel vm;
@@ -633,6 +634,8 @@ class _MainScreenState extends State<MainScreen> with WindowListener {
                       // Оверлей технической статистики
                       if (!vm.compactMode && vm.overlay == OverlayType.stats)
                         StatsOverlay(vm: vm),
+
+                      if (vm.update != null) UpdateDialog(vm: vm),
 
                       if (_dropActive)
                         Positioned.fill(
