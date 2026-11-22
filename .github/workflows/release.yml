@@ -356,6 +356,18 @@ jobs:
     env:
       VERSION_NAME: ${{ needs.version.outputs.name }}
     steps:
+      - name: Generate and upload SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p release-assets
+          gh release download "$VERSION_NAME" --dir release-assets --clobber
+          (
+            cd release-assets
+            find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%f\n' | sort | xargs sha256sum > SHA256SUMS
+          )
+          gh release upload "$VERSION_NAME" release-assets/SHA256SUMS --clobber
+
       - name: Verify assets and publish
         env:
           GH_TOKEN: ${{ github.token }}
@@ -369,4 +381,8 @@ jobs:
               exit 1
             fi
           done
+          if ! grep -Fxq "SHA256SUMS" <<< "$assets"; then
+            echo "::error::Missing release asset SHA256SUMS"
+            exit 1
+          fi
           gh release edit "$VERSION_NAME" --draft=false --latest
