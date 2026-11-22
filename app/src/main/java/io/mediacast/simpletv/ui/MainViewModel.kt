@@ -560,16 +560,22 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (updateJob?.isActive == true) return
         updateJob = viewModelScope.launch {
             if (manual) _updateBusy.value = text(R.string.update_checking)
-            val info = withContext(Dispatchers.IO) {
-                runCatching { UpdateManager.check(BuildConfig.VERSION_NAME) }.getOrNull()
+            val result = withContext(Dispatchers.IO) {
+                runCatching { UpdateManager.check(BuildConfig.VERSION_NAME) }
             }
             _updateBusy.value = null
-            if (info != null) {
-                _update.value = info
-                show(text(R.string.update_available_title))
-            } else if (manual) {
-                show(text(R.string.update_latest))
-            }
+            result
+                .onSuccess { info ->
+                    if (info != null) {
+                        _update.value = info
+                        show(text(R.string.update_available_title))
+                    } else if (manual) {
+                        show(text(R.string.update_latest))
+                    }
+                }
+                .onFailure { error ->
+                    if (manual) show(text(R.string.update_error, error.message ?: ""))
+                }
         }
     }
 
