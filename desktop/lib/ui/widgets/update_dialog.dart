@@ -75,6 +75,7 @@ class UpdateDialog extends StatelessWidget {
                         ),
                         const SizedBox(width: AppSpace.sm),
                         FilledButton(
+                          autofocus: true,
                           onPressed: busy == null
                               ? vm.downloadAndInstallUpdate
                               : null,
