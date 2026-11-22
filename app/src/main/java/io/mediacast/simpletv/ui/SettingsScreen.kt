@@ -332,7 +332,7 @@ private fun PlaylistsSection(vm: MainViewModel, firstFr: FocusRequester, bump: (
                 stringResource(R.string.dialog_new_playlist),
                 listOf(
                     stringResource(R.string.field_name) to "",
-                    stringResource(R.string.field_link_m3u) to "https://",
+                    stringResource(R.string.field_link_m3u) to stringResource(R.string.url_prefix),
                     stringResource(R.string.field_ua_optional) to "",
                 ),
             ) { v ->
@@ -491,7 +491,7 @@ private fun EpgSection(vm: MainViewModel, firstFr: FocusRequester, bump: () -> U
         item {
             val request = EditRequest(
                 stringResource(R.string.dialog_epg_source),
-                listOf(stringResource(R.string.field_name) to "", stringResource(R.string.field_link) to "https://"),
+                listOf(stringResource(R.string.field_name) to "", stringResource(R.string.field_link) to stringResource(R.string.url_prefix)),
             ) { v ->
                 if (v[1].trim().length > 8) vm.addEpgSource(v[0], v[1])
                 else vm.show(invalidUrl)

@@ -1358,16 +1358,16 @@ private fun rememberStats(vm: MainViewModel, periodMs: Long) = produceState(Stre
 @Composable
 private fun variantInfo(v: StreamVariant): String = listOfNotNull(
     when (v.kind) {
-        StreamKind.WINK -> "Wink"
-        StreamKind.BEELINE -> "Beeline"
+        StreamKind.WINK -> stringResource(R.string.variant_wink)
+        StreamKind.BEELINE -> stringResource(R.string.variant_beeline)
         else -> null
     },
     when {
-        v.url.contains(".mpd", ignoreCase = true) -> "DASH"
-        v.url.contains("m3u8", ignoreCase = true) -> "HLS"
+        v.url.contains(".mpd", ignoreCase = true) -> stringResource(R.string.variant_dash)
+        v.url.contains("m3u8", ignoreCase = true) -> stringResource(R.string.variant_hls)
         else -> null
     },
-    v.clearKey?.let { "ClearKey" },
+    v.clearKey?.let { stringResource(R.string.variant_clearkey) },
     v.catchup?.let { stringResource(R.string.archive_label, formatDays(it.days)) },
     v.userAgent?.let { stringResource(R.string.variant_own_ua) },
 ).joinToString(" · ").ifEmpty { stringResource(R.string.variant_stream) }
@@ -1389,14 +1389,14 @@ private fun statsRows(st: StreamStats, s: PlaybackState): List<Pair<String, Stri
     }
     return listOfNotNull(
         stringResource(R.string.stats_protocol) to (st.protocol + (st.drm?.let { " • $it" } ?: "")),
-        stringResource(R.string.stats_source) to (if (v != null) stringResource(R.string.stats_source_value, v.sourceName, s.variantIndex + 1, ch.variants.size) else "—"),
-        stringResource(R.string.stats_video) to listOfNotNull(st.videoCodec, st.resolution, st.frameRate?.let { "${fmtFps(it)} fps" }, st.hdr).joinToString(" • ").ifEmpty { "—" },
+        stringResource(R.string.stats_source) to (if (v != null) stringResource(R.string.stats_source_value, v.sourceName, s.variantIndex + 1, ch.variants.size) else stringResource(R.string.stats_empty)),
+        stringResource(R.string.stats_video) to listOfNotNull(st.videoCodec, st.resolution, st.frameRate?.let { stringResource(R.string.stats_fps, fmtFps(it)) }, st.hdr).joinToString(" • ").ifEmpty { stringResource(R.string.stats_empty) },
         st.videoProfile?.let { stringResource(R.string.stats_profile) to it },
         stringResource(R.string.stats_video_bitrate) to fmtRate(st.videoBitrate?.toLong()),
         st.videoDecoder?.let { stringResource(R.string.stats_video_decoder) to "$it ($hwVideo)" },
         stringResource(R.string.stats_frames) to stringResource(
             R.string.stats_frames_value,
-            st.renderFps?.let { fmtFps((it * 10).toInt() / 10f) } ?: "—",
+            st.renderFps?.let { fmtFps((it * 10).toInt() / 10f) } ?: stringResource(R.string.stats_empty),
             st.droppedFrames,
         ),
         stringResource(R.string.stats_audio) to listOfNotNull(
@@ -1404,7 +1404,7 @@ private fun statsRows(st: StreamStats, s: PlaybackState): List<Pair<String, Stri
             st.audioChannels?.let { channelsLabel(it) },
             st.sampleRate?.let { stringResource(R.string.stats_sample_rate, (it / 1000.0).toString().removeSuffix(".0")) },
             st.audioLang,
-        ).joinToString(" • ").ifEmpty { "—" },
+        ).joinToString(" • ").ifEmpty { stringResource(R.string.stats_empty) },
         stringResource(R.string.stats_audio_bitrate) to fmtRate(st.audioBitrate?.toLong()),
         st.audioDecoder?.let { stringResource(R.string.stats_audio_decoder) to "$it ($hwAudio)" },
         stringResource(R.string.stats_network) to stringResource(R.string.stats_network_value, fmtRate(st.bandwidth), fmtRate(st.throughput)),
@@ -1414,7 +1414,7 @@ private fun statsRows(st: StreamStats, s: PlaybackState): List<Pair<String, Stri
             } ?: stringResource(R.string.stats_buffer_value, "%.1f".format(java.util.Locale.US, st.bufferSec))
             ),
         stringResource(R.string.stats_loaded) to stringResource(R.string.stats_loaded_value, "%.1f".format(java.util.Locale.US, st.bytesLoaded / 1_048_576.0)),
-        stringResource(R.string.stats_user_agent) to (s.userAgent ?: "—"),
+        stringResource(R.string.stats_user_agent) to (s.userAgent ?: stringResource(R.string.stats_empty)),
     )
 }
 

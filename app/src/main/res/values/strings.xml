@@ -151,6 +151,7 @@
     <string name="add_epg_desc">Ссылка на xml или xml.gz</string>
     <string name="dialog_epg_source">Источник телепрограммы</string>
     <string name="field_link">Ссылка</string>
+    <string name="url_prefix">https://</string>
     <string name="action_refresh_epg">Обновить телепрограмму</string>
     <string name="action_clear_epg">Очистить базу и загрузить заново</string>
     <string name="clear_epg_desc">Удалить локальную базу программы передач и загрузить заново</string>
@@ -217,6 +218,11 @@
     <string name="guide_not_loaded">Телепрограмма ещё не загружена</string>
     <string name="no_programme">Нет программы для этого канала</string>
     <string name="variant_stream">поток</string>
+    <string name="variant_wink">Wink</string>
+    <string name="variant_beeline">Beeline</string>
+    <string name="variant_dash">DASH</string>
+    <string name="variant_hls">HLS</string>
+    <string name="variant_clearkey">ClearKey</string>
     <string name="variant_own_ua">свой UA</string>
 
     <!-- Stream statistics -->
@@ -229,6 +235,8 @@
     <string name="stats_video_decoder">Декодер видео</string>
     <string name="stats_frames">Кадры</string>
     <string name="stats_frames_value">вывод %1$s fps • потеряно %2$d</string>
+    <string name="stats_fps">%1$s fps</string>
+    <string name="stats_empty">—</string>
     <string name="stats_audio">Аудио</string>
     <string name="stats_audio_bitrate">Битрейт аудио</string>
     <string name="stats_audio_decoder">Декодер аудио</string>
@@ -279,6 +287,7 @@
     <string name="error_http_code">Сервер ответил %1$d</string>
     <string name="error_no_connection">Нет связи с сервером потока</string>
     <string name="error_drm">Ошибка расшифровки (DRM)</string>
+    <string name="error_playback_unknown">Не удалось воспроизвести поток</string>
     <string name="error_format_unsupported">Формат не поддерживается устройством</string>
     <string name="protocol_progressive">прогрессивный</string>
     <string name="quality_kbps">%1$d кбит/с</string>

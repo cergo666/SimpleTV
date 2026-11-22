@@ -321,7 +321,7 @@ class PlayerController(
             e.errorCode in 2000..2999 -> appContext.getString(R.string.error_no_connection)
             e.errorCode in 6000..6999 -> appContext.getString(R.string.error_drm)
             e.errorCode in 4000..4999 -> appContext.getString(R.string.error_format_unsupported)
-            else -> e.errorCodeName.removePrefix("ERROR_CODE_").lowercase(java.util.Locale.ROOT).replace('_', ' ')
+            else -> appContext.getString(R.string.error_playback_unknown)
         }
     }
 

@@ -142,6 +142,7 @@
     <string name="add_epg_desc">URL of xml or xml.gz</string>
     <string name="dialog_epg_source">Programme guide source</string>
     <string name="field_link">URL</string>
+    <string name="url_prefix">https://</string>
     <string name="action_refresh_epg">Refresh programme guide</string>
     <string name="action_clear_epg">Clear database and reload</string>
     <string name="clear_epg_desc">Delete the local guide database and download it again</string>
@@ -203,6 +204,11 @@
     <string name="guide_not_loaded">Programme guide is not loaded yet</string>
     <string name="no_programme">No programme for this channel</string>
     <string name="variant_stream">stream</string>
+    <string name="variant_wink">Wink</string>
+    <string name="variant_beeline">Beeline</string>
+    <string name="variant_dash">DASH</string>
+    <string name="variant_hls">HLS</string>
+    <string name="variant_clearkey">ClearKey</string>
     <string name="variant_own_ua">custom UA</string>
 
     <string name="stats_protocol">Protocol</string>
@@ -214,6 +220,8 @@
     <string name="stats_video_decoder">Video decoder</string>
     <string name="stats_frames">Frames</string>
     <string name="stats_frames_value">rendered %1$s fps • dropped %2$d</string>
+    <string name="stats_fps">%1$s fps</string>
+    <string name="stats_empty">—</string>
     <string name="stats_audio">Audio</string>
     <string name="stats_audio_bitrate">Audio bitrate</string>
     <string name="stats_audio_decoder">Audio decoder</string>
@@ -261,6 +269,7 @@
     <string name="error_http_code">Server responded %1$d</string>
     <string name="error_no_connection">No connection to the stream server</string>
     <string name="error_drm">Decryption error (DRM)</string>
+    <string name="error_playback_unknown">Unable to play the stream</string>
     <string name="error_format_unsupported">Format not supported by the device</string>
     <string name="protocol_progressive">progressive</string>
     <string name="quality_kbps">%1$d kbps</string>
