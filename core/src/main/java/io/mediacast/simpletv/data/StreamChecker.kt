@@ -75,7 +75,7 @@ object StreamChecker {
                 Health.UNAVAILABLE to TRANSIENT_FAILURE_TTL_MS
             } catch (_: IOException) {
                 Health.UNAVAILABLE to UNAVAILABLE_TTL_MS
-            } catch (_: Exception) {
+            } catch (_: RuntimeException) {
                 Health.UNAVAILABLE to UNAVAILABLE_TTL_MS
             }
         entries.putIfAbsent(variant.url, Entry(result, clock() + ttl))

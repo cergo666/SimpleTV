@@ -186,7 +186,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            raw = playlists.loadMerged()
+            raw = runCatching { playlists.loadMerged() }
+                .getOrElse { e ->
+                    show(text(R.string.error_refresh, e.message ?: ""))
+                    emptyList()
+                }
             val list = arrange(raw)
             _channels.value = list
             zapList = list
@@ -439,25 +443,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     // ------------------------------------------------------------ EPG (вызывается из UI в IO)
 
     private val nowNextCache = ConcurrentHashMap<String, List<Programme>>()
+    private val nowNextLock = Any()
     private val scheduleCache = object : LinkedHashMap<String, List<Programme>>(128, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<Programme>>?): Boolean = size > 256
     }
 
     private fun bumpEpgVersion() {
-        nowNextCache.clear()
+        synchronized(nowNextLock) { nowNextCache.clear() }
         synchronized(scheduleCache) { scheduleCache.clear() }
         _epgVersion.value++
     }
 
     fun peekNowNext(ch: Channel, now: Long): List<Programme>? =
-        nowNextCache["${ch.key}|${now / 60_000}"]
+        synchronized(nowNextLock) { nowNextCache["${ch.key}|${now / 60_000}"] }
 
     suspend fun nowNextCached(ch: Channel, now: Long): List<Programme> {
         val key = "${ch.key}|${now / 60_000}"
-        nowNextCache[key]?.let { return it }
+        synchronized(nowNextLock) { nowNextCache[key] }?.let { return it }
         val list = withContext(Dispatchers.IO) { epg.nowNext(ch, now) }
-        if (nowNextCache.size > 600) nowNextCache.clear()
-        nowNextCache[key] = list
+        synchronized(nowNextLock) {
+            if (nowNextCache.size > 600) nowNextCache.clear()
+            nowNextCache[key] = list
+        }
         return list
     }
 
