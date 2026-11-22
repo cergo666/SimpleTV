@@ -1,17 +1,18 @@
 [versions]
-agp = "9.5.1"
+agp = "9.5.2"
 kotlin = "2.2.10"
 composeBom = "2026.09.00"
 activityCompose = "1.10.1"
 lifecycle = "2.9.2"
 coreKtx = "1.19.1"
+# Keep Media3 on 1.9.x: the Jellyfin FFmpeg decoder does not publish a newer matching build.
 media3 = "1.9.0"
 coroutines = "1.11.0"
 json = "20260814"
 ktlint = "12.1.2"
 junit = "4.13.2"
-robolectric = "4.16"
-androidxTestCore = "1.6.1"
+robolectric = "4.18.1"
+androidxTestCore = "1.7.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
