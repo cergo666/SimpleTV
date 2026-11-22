@@ -43,7 +43,7 @@ class UpdateService {
       RegExp(r'^v'),
       '',
     );
-    if (version.isEmpty || !_isNewer(version, current)) return null;
+    if (version.isEmpty || !isNewer(version, current)) return null;
 
     final assets = <String, String>{};
     String? checksumsUrl;
@@ -193,7 +193,7 @@ class UpdateService {
     return digest.toString();
   }
 
-  bool _isNewer(String remote, String current) {
+  static bool isNewer(String remote, String current) {
     List<int> parts(String value) => value
         .replaceFirst(RegExp(r'^v'), '')
         .split('-')
