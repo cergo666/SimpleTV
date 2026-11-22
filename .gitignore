@@ -12,6 +12,10 @@ keystore/
 /data/
 /out/
 .codegraph/
+# Python tooling caches
+__pycache__/
+*.pyc
+
 # Crash and diagnostic dumps
 *-backtrace.txt
 *.dmp
