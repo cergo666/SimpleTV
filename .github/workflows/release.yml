@@ -187,7 +187,7 @@ jobs:
         run: |
           gh release upload "$VERSION_NAME" "out/SimpleTV-${VERSION_NAME#v}.apk" --clobber
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: needs.version.outputs.publish != 'true'
         with:
           retention-days: 3
@@ -275,7 +275,7 @@ jobs:
             "out/SimpleTV-${VERSION_NAME#v}-x86_64.AppImage" \
             "out/SimpleTV-${VERSION_NAME#v}-linux-x64.tar.gz" --clobber
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: needs.version.outputs.publish != 'true' && !inputs.linux_validation
         with:
           retention-days: 3
@@ -331,7 +331,7 @@ jobs:
           $version = $env:VERSION_NAME.Substring(1)
           gh release upload $env:VERSION_NAME "out/SimpleTV-$version-Portable.exe" "out/SimpleTV-$version-Setup.exe" "out/SimpleTV-$version-Windows-Portable.zip" --clobber
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: needs.version.outputs.publish != 'true'
         with:
           retention-days: 3
