@@ -67,8 +67,9 @@ object UpdateManager {
         val directory = File(context.cacheDir, "updates").apply { mkdirs() }
         val target = File(directory, update.assetName)
         val expected = update.checksumsUrl
-            ?.let { runCatching { checksumFor(it, update.assetName) }.getOrNull() }
-        if (target.isFile && (expected == null || sha256(target) == expected)) return target
+            ?.let { checksumFor(it, update.assetName) }
+            ?: throw IOException("Missing SHA256SUMS")
+        if (target.isFile && sha256(target) == expected) return target
 
         val temporary = File(directory, "${update.assetName}.part")
         Http.open(
@@ -92,7 +93,7 @@ object UpdateManager {
             }
         }
 
-        if (expected != null && sha256(temporary) != expected) {
+        if (sha256(temporary) != expected) {
             temporary.delete()
             throw IOException("Checksum mismatch")
         }

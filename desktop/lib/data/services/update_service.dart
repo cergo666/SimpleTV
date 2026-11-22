@@ -76,9 +76,10 @@ class UpdateService {
     final directory = await getTemporaryDirectory();
     final target = File('${directory.path}${Platform.pathSeparator}$assetName');
     final expected = await _checksum(update, assetName);
-    if (await target.exists() &&
-        expected != null &&
-        await _sha256(target) == expected) {
+    if (expected == null) {
+      throw const FormatException('Missing SHA256SUMS');
+    }
+    if (await target.exists() && await _sha256(target) == expected) {
       onProgress(1);
       return target;
     }
@@ -104,7 +105,7 @@ class UpdateService {
     } finally {
       await sink.close();
     }
-    if (expected != null && await _sha256(temporary) != expected) {
+    if (await _sha256(temporary) != expected) {
       await temporary.delete();
       throw const FormatException('Update checksum mismatch');
     }
