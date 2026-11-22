@@ -1,7 +1,8 @@
 param(
     [string]$Version = "",
     [string]$OutputDir = "out",
-    [int]$BuildNumber = 1
+    [int]$BuildNumber = 1,
+    [string]$MpvSha256 = "30d3f9fa121ce24638610a9ae52f8957743f9dea416dd37dc4ff7e43589ef843"
 )
 
 $ErrorActionPreference = "Stop"
@@ -66,6 +67,10 @@ if (Test-Path $LocalNewMpv) {
         $TempExtract = "$ProjectRoot\out\mpv-temp"
         New-Item -ItemType Directory -Force -Path $TempExtract | Out-Null
         Invoke-WebRequest -Uri "https://github.com/shinchiro/mpv-winbuild-cmake/releases/download/20261101/mpv-dev-x86_64-20261101-git-48fca90e8c.7z" -OutFile $TempZip
+        $actualHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $TempZip).Hash.ToLowerInvariant()
+        if ($actualHash -ne $MpvSha256.ToLowerInvariant()) {
+            throw "libmpv archive checksum mismatch: expected $MpvSha256, got $actualHash"
+        }
         $7zExe = if (Test-Path "C:\Program Files\7-Zip\7z.exe") { "C:\Program Files\7-Zip\7z.exe" } else { "7z" }
         & $7zExe e -y -o"$TempExtract" "$TempZip" "libmpv-2.dll" | Out-Null
         if (Test-Path "$TempExtract\libmpv-2.dll") {
@@ -126,6 +131,9 @@ $SingleExeTarget = Join-Path $FullOutputDir "SimpleTV-$Version-Portable.exe"
 $PendingZip = Join-Path $FullOutputDir (".portable-" + [guid]::NewGuid().ToString("N") + ".zip")
 $PendingExe = [System.IO.Path]::ChangeExtension($PendingZip, ".exe")
 $Compiler = Join-Path $env:WINDIR "Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if (!(Test-Path $Compiler)) {
+    throw "C# compiler not found: $Compiler. Install .NET Framework 4.x or build the portable launcher with the .NET SDK."
+}
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 try {
     [System.IO.Compression.ZipFile]::CreateFromDirectory(

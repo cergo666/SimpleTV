@@ -5,6 +5,14 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 VERSION="${1:-}"
 OUTPUT_DIR="${2:-out}"
 BUILD_NUMBER="${GITHUB_RUN_NUMBER:-1}"
+APPIMAGE_TOOL_SHA256="${APPIMAGE_TOOL_SHA256:-e8c1169c4af66c3184d7ee110713d4be04befe671fa358e2c1591ee840553b03}"
+
+for tool in curl sha256sum strip patchelf ldd tar; do
+  command -v "$tool" >/dev/null 2>&1 || {
+    echo "Error: required tool not found: $tool" >&2
+    exit 1
+  }
+done
 
 if [[ -z "$VERSION" ]]; then
   VERSION="$(sed -n 's/^versionName=//p' "$PROJECT_ROOT/version.properties" | head -n 1)"
@@ -145,6 +153,7 @@ if [ ! -f "$APPIMAGE_TOOL" ]; then
   curl -sSL -o "$APPIMAGE_TOOL" https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
   chmod +x "$APPIMAGE_TOOL"
 fi
+printf '%s  %s\n' "$APPIMAGE_TOOL_SHA256" "$APPIMAGE_TOOL" | sha256sum --check
 
 APPIMAGE_OUT="$OUTPUT_DIR/SimpleTV-${VERSION}-x86_64.AppImage"
 ARCH=x86_64 "$APPIMAGE_TOOL" --appimage-extract-and-run "$APP_DIR" "$APPIMAGE_OUT"

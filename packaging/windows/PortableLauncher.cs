@@ -32,20 +32,31 @@ internal static class PortableLauncher
         }
         catch (Exception error)
         {
-            MessageBox.Show("Не удалось запустить SimpleTV.\n\n" + error.Message,
+            MessageBox.Show(L(
+                    "Не удалось запустить SimpleTV.\n\n" + error.Message,
+                    "Could not start SimpleTV.\n\n" + error.Message),
                 "SimpleTV", MessageBoxButtons.OK, MessageBoxIcon.Error);
             return 1;
         }
     }
 
+    private static string L(string russian, string english) =>
+        System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru"
+            ? russian
+            : english;
+
     private static string PrepareRuntime(Stream payload)
     {
         if (payload == null)
-            throw new InvalidDataException("В EXE отсутствуют файлы приложения.");
+            throw new InvalidDataException(L(
+                "В EXE отсутствуют файлы приложения.",
+                "The application payload is missing from the EXE."));
 
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrEmpty(localAppData))
-            throw new IOException("Папка LocalAppData недоступна.");
+            throw new IOException(L(
+                "Папка LocalAppData недоступна.",
+                "The LocalAppData folder is not available."));
         var cache = Path.Combine(localAppData, "SimpleTV", "portable");
         string hash;
         using (var sha256 = SHA256.Create())
@@ -66,7 +77,9 @@ internal static class PortableLauncher
                 archive.ExtractToDirectory(staging);
 
             if (!File.Exists(Path.Combine(staging, AppName)))
-                throw new InvalidDataException("В пакете отсутствует SimpleTV.exe.");
+                throw new InvalidDataException(L(
+                    "В пакете отсутствует SimpleTV.exe.",
+                    "SimpleTV.exe is missing from the package."));
 
             try
             {

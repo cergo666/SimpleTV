@@ -44,9 +44,17 @@ PrivilegesRequiredOverridesAllowed=commandline dialog
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
+[CustomMessages]
+russian.AssociatePlaylists=Ассоциировать файлы плейлистов (.m3u, .m3u8) с SimpleTV
+english.AssociatePlaylists=Associate playlist files (.m3u, .m3u8) with SimpleTV
+russian.FileAssociations=Ассоциации файлов:
+english.FileAssociations=File associations:
+russian.PlaylistFileType=Плейлист SimpleTV
+english.PlaylistFileType=SimpleTV playlist
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
-Name: "associate_m3u"; Description: "Ассоциировать файлы плейлистов (.m3u, .m3u8) с SimpleTV"; GroupDescription: "Ассоциации файлов:"
+Name: "associate_m3u"; Description: "{cm:AssociatePlaylists}"; GroupDescription: "{cm:FileAssociations}"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -59,7 +67,7 @@ Name: "{autodesktop}\SimpleTV"; Filename: "{app}\SimpleTV.exe"; Tasks: desktopic
 [Registry]
 Root: HKA; Subkey: "Software\Classes\.m3u"; ValueType: string; ValueName: ""; ValueData: "SimpleTV.Playlist"; Flags: uninsdeletevalue; Tasks: associate_m3u
 Root: HKA; Subkey: "Software\Classes\.m3u8"; ValueType: string; ValueName: ""; ValueData: "SimpleTV.Playlist"; Flags: uninsdeletevalue; Tasks: associate_m3u
-Root: HKA; Subkey: "Software\Classes\SimpleTV.Playlist"; ValueType: string; ValueName: ""; ValueData: "Плейлист SimpleTV"; Flags: uninsdeletekey; Tasks: associate_m3u
+Root: HKA; Subkey: "Software\Classes\SimpleTV.Playlist"; ValueType: string; ValueName: ""; ValueData: "{cm:PlaylistFileType}"; Flags: uninsdeletekey; Tasks: associate_m3u
 Root: HKA; Subkey: "Software\Classes\SimpleTV.Playlist\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\SimpleTV.exe,0"; Tasks: associate_m3u
 Root: HKA; Subkey: "Software\Classes\SimpleTV.Playlist\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\SimpleTV.exe"" ""%1"""; Tasks: associate_m3u
 
