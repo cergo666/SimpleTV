@@ -1,8 +1,7 @@
 package io.mediacast.simpletv.data
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -155,7 +154,8 @@ object StreamChecker {
         retainOnly(variants.mapTo(HashSet()) { it.url })
         val semaphore = Semaphore(maxConcurrency)
         variants.filter { status(it.url) == null }
-            .map { variant -> async { semaphore.withPermit { probeUrl(variant, defaultUserAgent) } } }
-            .awaitAll()
+            .forEach { variant ->
+                launch { semaphore.withPermit { probeUrl(variant, defaultUserAgent) } }
+            }
     }
 }
