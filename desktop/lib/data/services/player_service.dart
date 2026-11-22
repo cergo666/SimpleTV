@@ -494,7 +494,11 @@ class PlayerService {
     }
   }
 
-  void dispose() => unawaited(shutdown());
+  /// ChangeNotifier.dispose cannot await. The window-close path calls
+  /// [shutdown] directly and waits for it; this is only the last-resort hook.
+  void dispose() {
+    unawaited(shutdown());
+  }
 
   Future<void> shutdown() => _shutdown ??= _shutdownPlayer();
 
