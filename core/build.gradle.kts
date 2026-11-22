@@ -1,5 +1,7 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    // AGP is already on the build classpath through :app; the lint plugin must not pin a second version.
+    id("com.android.lint")
     alias(libs.plugins.ktlint)
 }
 
