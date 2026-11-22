@@ -19,7 +19,7 @@ object Http {
     ) : AutoCloseable {
         val notModified get() = code == 304
         val ok get() = code in 200..299
-        val contentLength: Long get() = conn?.contentLengthLong ?: -1L
+        val contentLength: Long get() = conn?.contentLength?.toLong() ?: -1L
 
         override fun close() {
             runCatching { body?.close() }
