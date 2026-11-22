@@ -40,10 +40,12 @@ internal static class PortableLauncher
         }
     }
 
-    private static string L(string russian, string english) =>
-        System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru"
+    private static string L(string russian, string english)
+    {
+        return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ru"
             ? russian
             : english;
+    }
 
     private static string PrepareRuntime(Stream payload)
     {
