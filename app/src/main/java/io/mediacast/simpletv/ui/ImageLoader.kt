@@ -77,7 +77,7 @@ object ImageLoader {
         if (isFailedRecently(url)) return null
         return withContext(Dispatchers.IO) {
             val dir = cacheDir
-            val file = dir?.let { File(it, md5(url)) }
+            val file = dir?.let { File(it, cacheKey(url)) }
             // Битый кэш не должен ронять LaunchedEffect — уходим в сеть.
             val bytes = file?.takeIf { it.exists() }?.let { runCatching { it.readBytes() }.getOrNull() } ?: net.withPermit {
                 runCatching { Http.getBytes(url, UserAgents.TVS_DOWNLOAD) }.getOrNull()
@@ -101,5 +101,5 @@ object ImageLoader {
         BitmapFactory.decodeByteArray(b, 0, b.size, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
     }.getOrNull()
 
-    private fun md5(s: String) = MessageDigest.getInstance("MD5").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
+    private fun cacheKey(s: String) = MessageDigest.getInstance("SHA-256").digest(s.toByteArray()).joinToString("") { "%02x".format(it) }
 }
