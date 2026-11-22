@@ -53,8 +53,10 @@ val versionProps =
     Properties().apply {
         rootProject.file("version.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
     }
-val defaultVersionName: String = versionProps.getProperty("versionName", "1.3.0")
-val defaultVersionCode: Int = versionProps.getProperty("versionCode", "14").toIntOrNull() ?: 14
+val defaultVersionName: String = versionProps.getProperty("versionName")
+    ?: error("version.properties is missing versionName")
+val defaultVersionCode: Int = versionProps.getProperty("versionCode")?.toIntOrNull()
+    ?: error("version.properties is missing a valid versionCode")
 
 android {
     namespace = "io.mediacast.simpletv"

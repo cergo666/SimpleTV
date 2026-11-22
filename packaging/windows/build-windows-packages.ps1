@@ -1,16 +1,24 @@
 param(
-    [string]$Version = "1.5.1",
+    [string]$Version = "",
     [string]$OutputDir = "out",
     [int]$BuildNumber = 1
 )
 
+$ErrorActionPreference = "Stop"
+$ProjectRoot = Resolve-Path "$PSScriptRoot\..\.."
+Set-Location $ProjectRoot
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $VersionFile = Join-Path $ProjectRoot "version.properties"
+    if (!(Test-Path $VersionFile)) { throw "version.properties not found: $VersionFile" }
+    $match = Select-String -Path $VersionFile -Pattern '^versionName=(.+)$' | Select-Object -First 1
+    if (!$match) { throw "versionName is missing from $VersionFile" }
+    $Version = $match.Matches[0].Groups[1].Value.Trim()
+}
 $Version = $Version -creplace '^v', ''
 if ($Version -cnotmatch '^(?:\d+\.\d+\.\d+|dev-\d+)$') {
     throw "Invalid package version: $Version"
 }
-$ErrorActionPreference = "Stop"
-$ProjectRoot = Resolve-Path "$PSScriptRoot\..\.."
-Set-Location $ProjectRoot
 
 Write-Host "=== Building SimpleTV Windows Packages (Version: $Version) ===" -ForegroundColor Cyan
 

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-1.5.1}"
-OUTPUT_DIR="${2:-out}"
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+VERSION="${1:-}"
+OUTPUT_DIR="${2:-out}"
 BUILD_NUMBER="${GITHUB_RUN_NUMBER:-1}"
+
+if [[ -z "$VERSION" ]]; then
+  VERSION="$(sed -n 's/^versionName=//p' "$PROJECT_ROOT/version.properties" | head -n 1)"
+fi
 
 if [[ ! "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+|dev-[0-9]+)$ || ! "$BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
   echo "Error: invalid package version or build number" >&2
