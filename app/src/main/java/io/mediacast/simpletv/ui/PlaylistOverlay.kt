@@ -42,6 +42,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -433,11 +434,15 @@ private fun GroupsColumn(
         HorizontalDivider(color = C.Divider, modifier = Modifier.padding(vertical = AppSpace.xs))
         val groupState = rememberLazyListState()
         val selectedGroupIdx = groups.indexOfFirst { it.name == selected }.coerceAtLeast(0)
-        val firstVisibleGroupIdx = groupState.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: selectedGroupIdx
-        val targetGroupName = if (groupState.layoutInfo.visibleItemsInfo.any { it.index == selectedGroupIdx }) {
-            groups.getOrNull(selectedGroupIdx)?.name
-        } else {
-            groups.getOrNull(firstVisibleGroupIdx)?.name
+        val targetGroupName by remember(groupState, groups, selectedGroupIdx) {
+            derivedStateOf {
+                val visible = groupState.layoutInfo.visibleItemsInfo
+                if (visible.any { it.index == selectedGroupIdx }) {
+                    groups.getOrNull(selectedGroupIdx)?.name
+                } else {
+                    groups.getOrNull(visible.firstOrNull()?.index ?: selectedGroupIdx)?.name
+                }
+            }
         }
         LazyColumn(
             Modifier.weight(1f),
@@ -659,11 +664,15 @@ private fun ChannelsColumn(
                 modifier = Modifier.padding(AppSpace.lg),
             )
         }
-        val firstVisibleChannelIdx = state.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
-        val effectiveTargetIdx = if (state.layoutInfo.visibleItemsInfo.isEmpty() || state.layoutInfo.visibleItemsInfo.any { it.index == target }) {
-            target
-        } else {
-            firstVisibleChannelIdx
+        val effectiveTargetIdx by remember(state, target) {
+            derivedStateOf {
+                val visible = state.layoutInfo.visibleItemsInfo
+                if (visible.isEmpty() || visible.any { it.index == target }) {
+                    target
+                } else {
+                    visible.firstOrNull()?.index ?: 0
+                }
+            }
         }
         LazyColumn(
             state = state,
@@ -1028,11 +1037,15 @@ fun EpgPanel(
                 modifier = Modifier.padding(vertical = AppSpace.sm),
             )
         }
-        val firstVisibleEpgIdx = state.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: 0
-        val effectiveEpgTargetIdx = if (state.layoutInfo.visibleItemsInfo.isEmpty() || state.layoutInfo.visibleItemsInfo.any { it.index == target }) {
-            target
-        } else {
-            firstVisibleEpgIdx
+        val effectiveEpgTargetIdx by remember(state, target) {
+            derivedStateOf {
+                val visible = state.layoutInfo.visibleItemsInfo
+                if (visible.isEmpty() || visible.any { it.index == target }) {
+                    target
+                } else {
+                    visible.firstOrNull()?.index ?: 0
+                }
+            }
         }
         LazyColumn(
             state = state,

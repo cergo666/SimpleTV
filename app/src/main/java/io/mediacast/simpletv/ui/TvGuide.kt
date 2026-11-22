@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -401,11 +402,15 @@ fun TvGuide(
         HorizontalDivider(color = C.Divider)
 
         val selectedChannelIdx = channels.indexOfFirst { it.key == selectedChannel?.key }.coerceAtLeast(0)
-        val firstVisibleGuideIdx = state.layoutInfo.visibleItemsInfo.firstOrNull()?.index ?: selectedChannelIdx
-        val targetRowIdx = if (state.layoutInfo.visibleItemsInfo.isEmpty() || state.layoutInfo.visibleItemsInfo.any { it.index == selectedChannelIdx }) {
-            selectedChannelIdx
-        } else {
-            firstVisibleGuideIdx
+        val targetRowIdx by remember(state, selectedChannelIdx) {
+            derivedStateOf {
+                val visible = state.layoutInfo.visibleItemsInfo
+                if (visible.isEmpty() || visible.any { it.index == selectedChannelIdx }) {
+                    selectedChannelIdx
+                } else {
+                    visible.firstOrNull()?.index ?: selectedChannelIdx
+                }
+            }
         }
         LazyColumn(
             state = state,
