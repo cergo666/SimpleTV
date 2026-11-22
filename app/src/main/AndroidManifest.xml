@@ -22,7 +22,7 @@
         android:supportsRtl="false"
         android:theme="@style/Theme.StvMini"
         android:usesCleartextTraffic="true"
-        tools:ignore="PictureInPictureIssue"
+        tools:ignore="PictureInPictureIssue,UnusedAttribute"
         tools:targetApi="24">
 
         <activity
